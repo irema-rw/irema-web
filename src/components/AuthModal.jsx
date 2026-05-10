@@ -6,7 +6,8 @@ import { useAuthStore } from '../store/authStore';
 import {
   auth, db, doc, setDoc, getDoc, serverTimestamp,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signInWithRedirect, googleProvider, updateProfile, sendPasswordResetEmail,
+  signInWithRedirect, googleProvider, updateProfile, sendPasswordResetEmail, sendEmailVerification,
+  reload, getIdToken,
   collection, query, where, getDocs, addDoc, updateDoc, runTransaction,
   storage, storageRef, uploadBytes, getDownloadURL
 } from '../firebase/config';
@@ -18,6 +19,11 @@ import {
   REVIEW_COOLDOWN_MESSAGE,
   validateReviewText,
 } from '../utils/reviewLimits';
+import {
+  EMAIL_VERIFICATION_REQUIRED_MESSAGE,
+  getEmailVerificationActionCodeSettings,
+  requiresEmailVerification,
+} from '../utils/emailVerification';
 import { resolveAuthFlow } from './AuthRedirectHandler';
 import { useNavigate } from 'react-router-dom';
 
@@ -53,6 +59,12 @@ export default function AuthModal() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verifyChecking, setVerifyChecking] = useState(false);
+  const [verifyResending, setVerifyResending] = useState(false);
+  const [verifyMessage, setVerifyMessage] = useState('');
+  const [verifyError, setVerifyError] = useState('');
+  const [verifyCooldown, setVerifyCooldown] = useState(false);
 
   // Write review state
   // Pre-select company from modalData (when clicking Write Review on a company page)
@@ -89,6 +101,7 @@ export default function AuthModal() {
       setRating(0); setComment(''); setCommentError(''); setReviewLimitBlock(''); setReviewLimitLoading(false); setReviewStep(1); setReviewSuccess(false);
       setSelectedImages([]); setImagePreviews([]); setShowAddBiz(false);
       setForgotMode(false); setForgotEmail(''); setForgotSent(false);
+      setVerificationEmail(''); setVerifyChecking(false); setVerifyResending(false); setVerifyMessage(''); setVerifyError(''); setVerifyCooldown(false);
     }
   }, [activeModal]);
 
@@ -161,6 +174,64 @@ export default function AuthModal() {
 
   function handleOverlayClick(e) { if (e.target === e.currentTarget) closeModal(); }
 
+  function showVerificationNotice(emailAddress) {
+    setVerificationEmail(emailAddress || auth.currentUser?.email || email);
+    setError('');
+    setVerifyError('');
+    setVerifyMessage('');
+  }
+
+  async function checkEmailVerified() {
+    const current = auth.currentUser || useAuthStore.getState().user;
+    if (!current) {
+      setVerifyError('Your session expired. Please sign in again to check verification.');
+      return;
+    }
+    setVerifyChecking(true);
+    setVerifyError('');
+    setVerifyMessage('');
+    try {
+      await reload(current);
+      await getIdToken(current, true);
+      useAuthStore.getState().setUser(current);
+      if (!current.emailVerified) {
+        setVerifyError('Your email is not verified yet. Please click the link in your inbox, then check again.');
+        return;
+      }
+      const updates = { emailVerified: true, emailVerifiedAt: serverTimestamp() };
+      await updateDoc(doc(db, 'users', current.uid), updates).catch(() => {});
+      useAuthStore.getState().setUserProfile({ ...(useAuthStore.getState().userProfile || {}), ...updates });
+      setVerifyMessage('Email verified. You can continue now.');
+      setTimeout(() => closeModal(), 700);
+    } catch (e) {
+      setVerifyError(e.message || 'Could not check verification status.');
+    } finally {
+      setVerifyChecking(false);
+    }
+  }
+
+  async function resendVerificationEmail() {
+    const current = auth.currentUser || useAuthStore.getState().user;
+    if (verifyCooldown) return;
+    if (!current) {
+      setVerifyError('Your session expired. Please sign in again to resend the verification email.');
+      return;
+    }
+    setVerifyResending(true);
+    setVerifyError('');
+    setVerifyMessage('');
+    try {
+      await sendEmailVerification(current, getEmailVerificationActionCodeSettings());
+      setVerifyMessage(`Verification email sent to ${current.email}.`);
+      setVerifyCooldown(true);
+      setTimeout(() => setVerifyCooldown(false), 60000);
+    } catch (e) {
+      setVerifyError(e.message || 'Could not resend verification email.');
+    } finally {
+      setVerifyResending(false);
+    }
+  }
+
   async function handleGoogleAuth() {
     if (!termsAccepted && !isLogin) { setError('Please accept the Terms & Conditions to continue.'); return; }
     setLoading(true); setError('');
@@ -193,13 +264,18 @@ export default function AuthModal() {
         const userRef = doc(db, 'users', uid);
         const userSnap = await getDoc(userRef);
         if (!userSnap.exists()) {
-          await setDoc(userRef, {
+          const profileData = {
             displayName: result.user.displayName,
             email: result.user.email,
             photoURL: result.user.photoURL,
             role: 'user',
+            authProvider: 'google',
+            emailVerificationRequired: false,
+            emailVerified: true,
             createdAt: serverTimestamp(),
-          });
+          };
+          await setDoc(userRef, profileData);
+          useAuthStore.getState().setUserProfile(profileData);
         }
         closeModal();
         return;
@@ -274,6 +350,14 @@ export default function AuthModal() {
         setBizWarning(true);
         setLoading(false); return;
       }
+      const userSnap = await getDoc(doc(db, 'users', uid)).catch(() => null);
+      const profileData = userSnap?.exists() ? userSnap.data() : null;
+      if (requiresEmailVerification(cred.user, profileData)) {
+        useAuthStore.getState().setUserProfile(profileData);
+        showVerificationNotice(cred.user.email);
+        setLoading(false);
+        return;
+      }
       closeModal();
     } catch (e) {
       setError(e.code === 'auth/invalid-credential' ? 'Invalid email or password' : e.message);
@@ -302,11 +386,21 @@ export default function AuthModal() {
       const uid = result.user.uid;
       const displayName = trimmedEmail.split('@')[0];
       await updateProfile(result.user, { displayName });
-      const profileData = { displayName, email: trimmedEmail, role: 'user', createdAt: serverTimestamp() };
+      await sendEmailVerification(result.user, getEmailVerificationActionCodeSettings());
+      const profileData = {
+        displayName,
+        email: trimmedEmail,
+        role: 'user',
+        authProvider: 'password',
+        emailVerificationRequired: true,
+        emailVerified: false,
+        emailVerificationRequiredAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      };
       await setDoc(doc(db, 'users', uid), profileData);
       // Force immediate profile update in authStore (onAuthStateChanged fires async)
       useAuthStore.getState().setUserProfile(profileData);
-      closeModal();
+      showVerificationNotice(trimmedEmail);
     } catch (e) {
       if (e.code === 'auth/email-already-in-use') {
         setError('This email is already registered. Try logging in, or use a different email.');
@@ -419,6 +513,10 @@ export default function AuthModal() {
   async function handleSubmitReview(e) {
     e.preventDefault();
     if (!user) { openModal('login'); return; }
+    if (requiresEmailVerification(user, useAuthStore.getState().userProfile)) {
+      setError(EMAIL_VERIFICATION_REQUIRED_MESSAGE);
+      return;
+    }
     if (!selectedCompany) { setError('Please search and select a business to review.'); return; }
     if (reviewLimitBlock) { setError(reviewLimitBlock); return; }
     if (rating === 0) { 
@@ -697,6 +795,34 @@ export default function AuthModal() {
 
   // Login / Signup
   const isLogin = activeModal === 'login';
+
+  if ((activeModal === 'login' || activeModal === 'signup') && verificationEmail) {
+    return (
+      <div className="modal-overlay" onClick={handleOverlayClick}>
+        <div className="modal-box">
+          <button className="modal-close-btn" onClick={closeModal}>✕</button>
+          <div className="modal-icon" style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <svg width="36" height="36" viewBox="0 0 60 60" fill="none"><rect width="60" height="60" rx="14" fill="#2d8f6f"/><path d="M30 8l3.9 7.9 8.7 1.3-6.3 6.1 1.5 8.6L30 27.9l-7.8 4.1 1.5-8.6-6.3-6.1 8.7-1.3z" fill="#FFD700"/><path d="M18 40h24M22 46h16" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
+          </div>
+          <h2>Check your inbox</h2>
+          <p className="modal-subtitle">
+            We sent a verification link to <strong>{verificationEmail}</strong>. Verify your email before using platform features.
+          </p>
+          {verifyMessage && <div className="alert" style={{background:'#eef8f3',borderColor:'#c8ead9',color:'#1f6b52',marginBottom:12}}>{verifyMessage}</div>}
+          {verifyError && <div className="alert alert-error" style={{marginBottom:12}}>{verifyError}</div>}
+          <button type="button" className="btn btn-primary" style={{width:'100%',marginBottom:10}} onClick={checkEmailVerified} disabled={verifyChecking}>
+            {verifyChecking ? 'Checking...' : "I've verified, check again"}
+          </button>
+          <button type="button" className="btn btn-outline" style={{width:'100%'}} onClick={resendVerificationEmail} disabled={verifyResending || verifyCooldown}>
+            {verifyResending ? 'Sending...' : verifyCooldown ? 'Resend available in 60 seconds' : 'Resend verification email'}
+          </button>
+          <p style={{fontSize:'0.78rem',lineHeight:1.5,color:'var(--text-4)',margin:'16px 0 0',textAlign:'center'}}>
+            The link opens through Firebase and then sends you back to Irema. Check spam if it is not in your inbox.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Forgot password screen — shown as overlay within the same modal
   if (forgotMode) {

@@ -1,7 +1,7 @@
 import Footer from '../components/Footer';
 import React, { useState, useEffect } from 'react';
 import { db, auth, collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from '../firebase/config';
-import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithRedirect, signInWithPopup, updateProfile, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, sendEmailVerification, signInWithRedirect, signInWithPopup, updateProfile, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
 import { googleProvider } from '../firebase/config';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../store/themeStore';
 import { useTranslation } from 'react-i18next';
 import { ensureUniqueSlug } from '../utils/slug';
+import { getEmailVerificationActionCodeSettings } from '../utils/emailVerification';
 import { resolveAuthFlow } from '../components/AuthRedirectHandler';
 import './BusinessesPage.css';
 
@@ -282,6 +283,7 @@ export default function BusinessesPage() {
         uid = cred.user.uid;
         userEmail = regForm.email;
         await updateProfile(cred.user, { displayName: `${regForm.firstName} ${regForm.lastName}` });
+        await sendEmailVerification(cred.user, getEmailVerificationActionCodeSettings());
       }
 
       // Write user doc (merge so we don't overwrite existing Google profile data)
@@ -291,7 +293,12 @@ export default function BusinessesPage() {
           ? (regGoogleUser.displayName || `${regForm.firstName} ${regForm.lastName}`)
           : `${regForm.firstName} ${regForm.lastName}`,
         firstName: regForm.firstName, lastName: regForm.lastName,
-        role: 'company_admin', createdAt: serverTimestamp()
+        role: 'company_admin',
+        authProvider: regGoogleUser ? 'google' : 'password',
+        emailVerificationRequired: !regGoogleUser,
+        emailVerified: !!regGoogleUser,
+        ...(!regGoogleUser && { emailVerificationRequiredAt: serverTimestamp() }),
+        createdAt: serverTimestamp()
       }, { merge: true });
 
       const fullAddress = [regForm.address, regForm.city, regForm.district].filter(Boolean).join(', ');
@@ -392,10 +399,16 @@ export default function BusinessesPage() {
         const cred = await createUserWithEmailAndPassword(auth, claimForm.email, claimForm.password);
         uid = cred.user.uid;
         await updateProfile(cred.user, { displayName: `${claimForm.firstName} ${claimForm.lastName}` });
+        await sendEmailVerification(cred.user, getEmailVerificationActionCodeSettings());
         await setDoc(doc(db,'users',uid), {
           uid, email: claimForm.email,
           displayName: `${claimForm.firstName} ${claimForm.lastName}`,
-          role: 'company_admin', createdAt: serverTimestamp(),
+          role: 'company_admin',
+          authProvider: 'password',
+          emailVerificationRequired: true,
+          emailVerified: false,
+          emailVerificationRequiredAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
           pendingClaimId: null, // Will be set after claim is created
         });
       } catch(authErr) {
