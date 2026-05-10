@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import StarRating from './StarRating';
 import { formatRelativeTime } from '../utils/helpers';
+import { validateReplyText } from '../utils/reviewLimits';
 
 const AVATAR_COLORS = ['#2d8f6f','#0ea5e9','#8b5cf6','#f59e0b','#ef4444','#14b8a6'];
 const avatarColor = name => AVATAR_COLORS[(name||'A').charCodeAt(0) % AVATAR_COLORS.length];
@@ -84,6 +85,7 @@ export default function ReviewModal({
   const [sending, setSending] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [delConfirm, setDelConfirm] = useState(false);
+  const [replyError, setReplyError] = useState('');
 
   if (!review) return null;
 
@@ -98,11 +100,20 @@ export default function ReviewModal({
   });
 
   const send = async () => {
-    if (!replyText.trim() || !onReply) return;
+    if (!onReply) return;
+    const validation = validateReplyText(replyText);
+    if (!validation.ok) {
+      setReplyError(validation.message);
+      return;
+    }
     setSending(true);
-    await onReply(review.id, replyText.trim(), mode);
-    setReplyText('');
-    setSending(false);
+    try {
+      await onReply(review.id, replyText.trim(), mode);
+      setReplyText('');
+      setReplyError('');
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -247,17 +258,26 @@ export default function ReviewModal({
                     : 'Write a comment…'
                   }
                   value={replyText}
-                  onChange={e=>setReplyText(e.target.value)}
-                  onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send()}
+                  onChange={e=>{
+                    const next = e.target.value;
+                    setReplyText(next);
+                    setReplyError(next.length > 1000 ? 'Replies can be at most 1000 characters.' : '');
+                  }}
+                  onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}
                 />
                 <button
                   className={`btn btn-sm ${mode==='user'?'btn-outline':'btn-primary'}`}
                   onClick={send}
-                  disabled={sending||!replyText.trim()}
+                  disabled={sending||!replyText.trim()||replyText.length > 1000}
                 >
                   {sending?'…':'Reply'}
                 </button>
               </div>
+              {replyError && (
+                <div style={{marginTop:8,fontSize:'0.78rem',color:'#ef4444',fontWeight:600}}>
+                  {replyError}
+                </div>
+              )}
             </div>
           )}
         </div>

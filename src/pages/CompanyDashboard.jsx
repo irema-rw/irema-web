@@ -17,6 +17,7 @@ import AnalyticsUpgradePrompt from '../components/AnalyticsUpgradePrompt';
 import TierComparison from '../components/TierComparison';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
 import { canStartProfessionalTrial } from '../utils/subscriptionAccess';
+import { validateReplyText } from '../utils/reviewLimits';
 
 /* ── Brand Logo ── */
 function BizLogo() {
@@ -606,6 +607,11 @@ export default function CompanyDashboard() {
     if (!canReplyToReviews) {
       showToast('Replying to reviews is available on Professional and Enterprise plans.', 'error');
       setSection('subscription');
+      return;
+    }
+    const validation = validateReplyText(replyText);
+    if (!validation.ok) {
+      showToast(validation.message, 'error');
       return;
     }
 
@@ -2321,6 +2327,7 @@ function BizReviewWidget({ review, onClick, canReply = true }) {
 function ReviewCard({ review, onReply, currentUser }) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
+  const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [showReply, setShowReply] = useState(true); // always open for business efficiency
   const [lightboxImg, setLightboxImg] = useState(null);
@@ -2342,10 +2349,14 @@ function ReviewCard({ review, onReply, currentUser }) {
   const otherReplies = (review.replies||[]).filter(r=>!(r.by==='business'||r.isBusinessReply));
 
   const send = async () => {
-    if (!text.trim()) return;
+    const validation = validateReplyText(text);
+    if (!validation.ok) {
+      setError(validation.message);
+      return;
+    }
     setSending(true);
     await onReply(review.id, text.trim());
-    setText(''); setShowReply(false);
+    setText(''); setError(''); setShowReply(false);
     setSending(false);
   };
 
@@ -2417,11 +2428,16 @@ function ReviewCard({ review, onReply, currentUser }) {
         <div className="biz-reply-compose">
           <textarea className="biz-input biz-reply-textarea" rows={3}
             placeholder="Write your response to this customer…"
-            value={text} onChange={e=>setText(e.target.value)}
+            value={text} onChange={e=>{
+              const next = e.target.value;
+              setText(next);
+              setError(next.length > 1000 ? 'Replies can be at most 1000 characters.' : '');
+            }}
             autoFocus/>
+          {error && <div style={{color:'#ef4444',fontSize:'0.78rem',fontWeight:600,marginBottom:8}}>{error}</div>}
           <div className="biz-reply-actions">
             <button className="biz-btn biz-btn-ghost biz-btn-sm" onClick={()=>{setShowReply(false);setText('');}}>{t('cd.cancel')||'Cancel'}</button>
-            <button className="biz-btn biz-btn-primary biz-btn-sm" onClick={send} disabled={sending||!text.trim()}>
+            <button className="biz-btn biz-btn-primary biz-btn-sm" onClick={send} disabled={sending||!text.trim()||text.length > 1000}>
               {sending?'Sending…':'Send Reply'}
             </button>
           </div>

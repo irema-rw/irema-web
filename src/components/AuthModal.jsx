@@ -12,6 +12,7 @@ import {
 } from '../firebase/config';
 import { signInWithPopup } from 'firebase/auth';
 import { ensureUniqueSlug } from '../utils/slug';
+import { validateReviewText } from '../utils/reviewLimits';
 import { resolveAuthFlow } from './AuthRedirectHandler';
 import { useNavigate } from 'react-router-dom';
 
@@ -57,6 +58,7 @@ export default function AuthModal() {
   const [companyResults, setCompanyResults] = useState([]);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [commentError, setCommentError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState(false);
   // Image upload
   const [selectedImages, setSelectedImages] = useState([]);
@@ -77,7 +79,7 @@ export default function AuthModal() {
     if (!activeModal) {
       setEmail(''); setPassword(''); setError(''); setLoading(false);
       setCompanySearch(''); setCompanyResults([]); setSelectedCompany(null);
-      setRating(0); setComment(''); setReviewStep(1); setReviewSuccess(false);
+      setRating(0); setComment(''); setCommentError(''); setReviewStep(1); setReviewSuccess(false);
       setSelectedImages([]); setImagePreviews([]); setShowAddBiz(false);
       setForgotMode(false); setForgotEmail(''); setForgotSent(false);
     }
@@ -391,10 +393,12 @@ export default function AuthModal() {
       if (starEl) { starEl.style.animation = 'shake 0.4s ease'; setTimeout(()=>{ starEl.style.animation=''; }, 400); }
       return; 
     }
-    if (!comment.trim() || comment.trim().length < 5) {
-      setError('Please write at least 5 characters in your review.');
+    const reviewValidation = validateReviewText(comment);
+    if (!reviewValidation.ok) {
+      setCommentError(reviewValidation.message);
       return;
     }
+    setCommentError('');
     setLoading(true); setError('');
     try {
       // Check if user is trying to review their own business
@@ -593,7 +597,12 @@ export default function AuthModal() {
                   <label className="form-label" style={{ marginTop: 16 }}>{t('review.your_experience')}</label>
                   <textarea className="input" rows={4} required
                     placeholder={t('review.comment_placeholder')}
-                    value={comment} onChange={e => setComment(e.target.value)} />
+                    value={comment} onChange={e => {
+                      const next = e.target.value;
+                      setComment(next);
+                      setCommentError(next.length > 1000 ? 'Reviews can be at most 1000 characters.' : '');
+                    }} />
+                  {commentError && <div className="alert alert-error">{commentError}</div>}
 
                   {/* Image upload */}
                   <div className="review-image-upload">
@@ -618,7 +627,7 @@ export default function AuthModal() {
                   </div>
 
                   {error && <div className="alert alert-error">{error}</div>}
-                  <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={loading || rating === 0}>
+                  <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={loading || rating === 0 || comment.length > 1000}>
                     {loading ? t('review.submitting') : t('review.submit')}
                   </button>
                 </form>

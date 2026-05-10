@@ -101,6 +101,12 @@ service cloud.firestore {
         request.resource.data.trialEndsAt <= request.time + duration.value(15, 'd');
     }
 
+    function isValidReviewComment(data) {
+      return data.comment is string &&
+        data.comment.size() >= 10 &&
+        data.comment.size() <= 1000;
+    }
+
     function companyHasPaidFeatureAccess(companyId) {
       return exists(/databases/$(database)/documents/companies/$(companyId)) &&
         get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionId is string &&
@@ -164,10 +170,15 @@ service cloud.firestore {
       // Pin the reviewer's userId to the auth uid so a signed-in user can't
       // forge a review attributed to someone else.
       allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid;
+        && request.resource.data.userId == request.auth.uid
+        && isValidReviewComment(request.resource.data);
       allow update: if isSignedIn() && (
         // Author can edit their own review
-        request.auth.uid == resource.data.userId ||
+        (request.auth.uid == resource.data.userId &&
+          (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['comment']) ||
+            isValidReviewComment(request.resource.data)
+          )) ||
         // Company owner can add replies to reviews of their own business
         (request.resource.data.replies != null &&
           exists(/databases/$(database)/documents/companies/$(resource.data.companyId)) &&
