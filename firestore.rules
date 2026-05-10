@@ -314,7 +314,7 @@ service cloud.firestore {
     }
 
     match /reports/{reportId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || (isSignedIn() && resource.data.reportedBy == request.auth.uid);
       allow create: if isSignedIn();
       allow update, delete: if isActiveAdmin();
     }
