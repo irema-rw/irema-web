@@ -12,7 +12,12 @@ import {
 } from '../firebase/config';
 import { signInWithPopup } from 'firebase/auth';
 import { ensureUniqueSlug } from '../utils/slug';
-import { validateReviewText } from '../utils/reviewLimits';
+import {
+  getReviewLimitId,
+  getReviewLimitStatus,
+  REVIEW_COOLDOWN_MESSAGE,
+  validateReviewText,
+} from '../utils/reviewLimits';
 import { resolveAuthFlow } from './AuthRedirectHandler';
 import { useNavigate } from 'react-router-dom';
 
@@ -59,6 +64,8 @@ export default function AuthModal() {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [commentError, setCommentError] = useState('');
+  const [reviewLimitLoading, setReviewLimitLoading] = useState(false);
+  const [reviewLimitBlock, setReviewLimitBlock] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState(false);
   // Image upload
   const [selectedImages, setSelectedImages] = useState([]);
@@ -79,11 +86,38 @@ export default function AuthModal() {
     if (!activeModal) {
       setEmail(''); setPassword(''); setError(''); setLoading(false);
       setCompanySearch(''); setCompanyResults([]); setSelectedCompany(null);
-      setRating(0); setComment(''); setCommentError(''); setReviewStep(1); setReviewSuccess(false);
+      setRating(0); setComment(''); setCommentError(''); setReviewLimitBlock(''); setReviewLimitLoading(false); setReviewStep(1); setReviewSuccess(false);
       setSelectedImages([]); setImagePreviews([]); setShowAddBiz(false);
       setForgotMode(false); setForgotEmail(''); setForgotSent(false);
     }
   }, [activeModal]);
+
+  useEffect(() => {
+    if (activeModal !== 'writeReview' || !user || !selectedCompany?.id) {
+      setReviewLimitBlock('');
+      setReviewLimitLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setReviewLimitLoading(true);
+    setReviewLimitBlock('');
+    const limitRef = doc(db, 'review_limits', getReviewLimitId(selectedCompany.id, user.uid));
+    getDoc(limitRef)
+      .then(snap => {
+        if (cancelled) return;
+        const status = getReviewLimitStatus(snap.exists() ? snap.data() : null);
+        setReviewLimitBlock(status.blocked ? status.message : '');
+      })
+      .catch(() => {
+        if (!cancelled) setReviewLimitBlock('');
+      })
+      .finally(() => {
+        if (!cancelled) setReviewLimitLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeModal, user?.uid, selectedCompany?.id]);
 
   if (!['login', 'signup', 'writeReview'].includes(activeModal)) return null;
 
@@ -386,6 +420,7 @@ export default function AuthModal() {
     e.preventDefault();
     if (!user) { openModal('login'); return; }
     if (!selectedCompany) { setError('Please search and select a business to review.'); return; }
+    if (reviewLimitBlock) { setError(reviewLimitBlock); return; }
     if (rating === 0) { 
       setError('⭐ Please select a star rating before submitting.');
       // Shake the star input to draw attention
@@ -412,8 +447,6 @@ export default function AuthModal() {
         return;
       }
 
-      // Users can review any number of times - no rate limiting
-
       // Create the review with status 'pending' so admins can moderate before it goes live
       const reviewData = {
         userId: user.uid, userName: user.displayName || user.email,
@@ -421,7 +454,24 @@ export default function AuthModal() {
         rating, comment: sanitizeText(comment), createdAt: serverTimestamp(), replies: [], helpful: 0, status: 'pending',
         images: [],
       };
-      const reviewRef = await addDoc(collection(db, 'reviews'), reviewData);
+      const reviewRef = doc(collection(db, 'reviews'));
+      const limitRef = doc(db, 'review_limits', getReviewLimitId(selectedCompany.id, user.uid));
+
+      await runTransaction(db, async (txn) => {
+        const limitSnap = await txn.get(limitRef);
+        const limitStatus = getReviewLimitStatus(limitSnap.exists() ? limitSnap.data() : null);
+        if (limitStatus.blocked) {
+          throw new Error(REVIEW_COOLDOWN_MESSAGE);
+        }
+        txn.set(reviewRef, reviewData);
+        txn.set(limitRef, {
+          companyId: selectedCompany.id,
+          userId: user.uid,
+          lastReviewedAt: serverTimestamp(),
+          lastReviewId: reviewRef.id,
+          updatedAt: serverTimestamp(),
+        });
+      });
 
       // Upload images to Firebase Storage (using review ID as folder), then update review
       if (selectedImages.length > 0) {
@@ -535,7 +585,7 @@ export default function AuthModal() {
                   {companyResults.length > 0 && (
                     <div className="company-results">
                       {companyResults.map(c => (
-                        <button key={c.id} className="company-result-item" onClick={() => { setSelectedCompany(c); setReviewStep(2); }}>
+                        <button key={c.id} className="company-result-item" onClick={() => { setSelectedCompany(c); setReviewLimitBlock(''); setReviewStep(2); }}>
                           <div className="company-result-avatar">{(c.companyName || c.name || '?')[0]}</div>
                           <div>
                             <div className="company-result-name">{c.companyName || c.name}</div>
@@ -588,8 +638,14 @@ export default function AuthModal() {
                       <strong>{selectedCompany.companyName || selectedCompany.name}</strong>
                       <div style={{ fontSize: '0.82rem', color: 'var(--text-3)', textTransform:'capitalize' }}>{(selectedCompany.category||"").replace(/_/g," ")}</div>
                     </div>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setReviewStep(1); setSelectedImages([]); setImagePreviews([]); }} style={{ marginLeft: 'auto' }}>Change</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setReviewStep(1); setReviewLimitBlock(''); setSelectedImages([]); setImagePreviews([]); }} style={{ marginLeft: 'auto' }}>Change</button>
                   </div>
+
+                  {reviewLimitLoading ? (
+                    <div className="alert" style={{marginTop:12}}>Checking review eligibility…</div>
+                  ) : reviewLimitBlock ? (
+                    <div className="alert alert-error" style={{marginTop:12}}>{reviewLimitBlock}</div>
+                  ) : null}
 
                   <label className="form-label">{t('review.your_rating')}</label>
                   <StarRatingInput value={rating} onChange={setRating} size={36} />
@@ -627,7 +683,7 @@ export default function AuthModal() {
                   </div>
 
                   {error && <div className="alert alert-error">{error}</div>}
-                  <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={loading || rating === 0 || comment.length > 1000}>
+                  <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={loading || reviewLimitLoading || !!reviewLimitBlock || rating === 0 || comment.length > 1000}>
                     {loading ? t('review.submitting') : t('review.submit')}
                   </button>
                 </form>

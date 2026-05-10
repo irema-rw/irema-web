@@ -4,6 +4,9 @@ import {
   REVIEW_MAX_CHARACTERS,
   REVIEW_MIN_CHARACTERS,
   REPLY_MAX_CHARACTERS,
+  REVIEW_COOLDOWN_MS,
+  getReviewLimitId,
+  getReviewLimitStatus,
   validateReplyText,
   validateReviewText,
 } from './reviewLimits.js';
@@ -35,4 +38,27 @@ test('replies reject text longer than 1000 characters without trimming', () => {
   });
 
   assert.deepEqual(validateReplyText('a'.repeat(1000)), { ok: true, message: '' });
+});
+
+test('review limit id combines company and user deterministically', () => {
+  assert.equal(getReviewLimitId('company-a', 'user-b'), 'company-a_user-b');
+});
+
+test('review cooldown blocks another review inside 24 hours', () => {
+  const now = new Date('2026-05-10T12:00:00Z');
+  const status = getReviewLimitStatus({
+    lastReviewedAt: new Date(now.getTime() - REVIEW_COOLDOWN_MS + 1000),
+  }, now);
+
+  assert.equal(status.blocked, true);
+  assert.equal(status.message, 'You already reviewed this business today. You can review it again tomorrow.');
+});
+
+test('review cooldown allows another review after 24 hours', () => {
+  const now = new Date('2026-05-10T12:00:00Z');
+  const status = getReviewLimitStatus({
+    lastReviewedAt: new Date(now.getTime() - REVIEW_COOLDOWN_MS - 1000),
+  }, now);
+
+  assert.equal(status.blocked, false);
 });

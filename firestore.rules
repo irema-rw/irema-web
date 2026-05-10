@@ -107,6 +107,39 @@ service cloud.firestore {
         data.comment.size() <= 1000;
     }
 
+    function reviewLimitPath(companyId, uid) {
+      return /databases/$(database)/documents/review_limits/$(companyId + '_' + uid);
+    }
+
+    function isReviewCooldownOpen(data) {
+      return !exists(reviewLimitPath(data.companyId, request.auth.uid)) ||
+        get(reviewLimitPath(data.companyId, request.auth.uid)).data.lastReviewedAt + duration.value(24, 'h') <= request.time;
+    }
+
+    function hasMatchingReviewLimitAfter(reviewId, data) {
+      return existsAfter(reviewLimitPath(data.companyId, request.auth.uid)) &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.companyId == data.companyId &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.userId == request.auth.uid &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.lastReviewId == reviewId &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.lastReviewedAt == request.time &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.updatedAt == request.time;
+    }
+
+    function isValidReviewLimitWrite(docId) {
+      return request.resource.data.keys().hasOnly([
+          'companyId', 'userId', 'lastReviewedAt', 'lastReviewId', 'updatedAt'
+        ]) &&
+        docId == request.resource.data.companyId + '_' + request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.companyId is string &&
+        request.resource.data.lastReviewId is string &&
+        request.resource.data.lastReviewedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        existsAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)) &&
+        getAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)).data.companyId == request.resource.data.companyId &&
+        getAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)).data.userId == request.auth.uid;
+    }
+
     function companyHasPaidFeatureAccess(companyId) {
       return exists(/databases/$(database)/documents/companies/$(companyId)) &&
         get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionId is string &&
@@ -171,7 +204,9 @@ service cloud.firestore {
       // forge a review attributed to someone else.
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
-        && isValidReviewComment(request.resource.data);
+        && isValidReviewComment(request.resource.data)
+        && isReviewCooldownOpen(request.resource.data)
+        && hasMatchingReviewLimitAfter(reviewId, request.resource.data);
       allow update: if isSignedIn() && (
         // Author can edit their own review
         (request.auth.uid == resource.data.userId &&
@@ -202,6 +237,13 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid;
       allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    match /review_limits/{docId} {
+      allow get: if isSignedIn() && docId.matches('^.+_' + request.auth.uid + '$');
+      allow list: if false;
+      allow create, update: if isSignedIn() && isValidReviewLimitWrite(docId);
+      allow delete: if false;
     }
 
     match /notifications/{notifId} {
