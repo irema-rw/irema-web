@@ -174,6 +174,8 @@ export default function UserDashboard() {
   const [searchParams] = useSearchParams();
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editName, setEditName] = useState('');
+  const [myReports, setMyReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
 
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
@@ -188,7 +190,21 @@ export default function UserDashboard() {
     } catch(e) { showToast('Update failed: ' + e.message, 'error'); }
   }
 
-  useEffect(() => { if (user) loadReviews(); }, [user]);
+  useEffect(() => { if (user) { loadReviews(); loadMyReports(); } }, [user]);
+
+  async function loadMyReports() {
+    setReportsLoading(true);
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'reports'),
+        where('reportedBy', '==', user.uid)
+      ));
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setMyReports(data);
+    } catch(e) { console.error(e); }
+    setReportsLoading(false);
+  }
 
   async function loadReviews() {
     setLoading(true);
@@ -397,6 +413,90 @@ export default function UserDashboard() {
                 i18n={i18n}
               />
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── My Reports ── */}
+      <div className="container" style={{ marginTop: 40 }}>
+        <div className="ud-section-header">
+          <div>
+            <h2 className="ud-section-title">
+              My Reports
+              <span className="ud-section-count">{myReports.length}</span>
+            </h2>
+            <p className="ud-section-sub">Reviews you have flagged for our moderation team.</p>
+          </div>
+        </div>
+
+        {reportsLoading ? (
+          <LoadingSpinner />
+        ) : myReports.length === 0 ? (
+          <div className="ud-empty card">
+            <div className="ud-empty-icon">🏳️</div>
+            <h3>No reports submitted</h3>
+            <p>You haven't flagged any reviews yet. Use the flag icon on a review to report it.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {myReports.map(report => {
+              const statusColor = report.status === 'resolved'
+                ? { bg: '#f0faf6', text: '#1f6b52', border: '#bbf7d0' }
+                : report.status === 'dismissed'
+                ? { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' }
+                : { bg: '#fffbeb', text: '#92400e', border: '#fde68a' };
+              const createdAt = report.createdAt?.toDate
+                ? report.createdAt.toDate()
+                : report.createdAt?.seconds
+                ? new Date(report.createdAt.seconds * 1000)
+                : null;
+
+              return (
+                <div key={report.id} style={{
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 12, padding: '14px 16px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Business name */}
+                      {report.companyName && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginBottom: 4 }}>
+                          📍 {report.companyName}
+                        </div>
+                      )}
+                      {/* Review snippet */}
+                      <p style={{
+                        margin: '0 0 8px', fontSize: '0.85rem', color: 'var(--text-2)',
+                        lineHeight: 1.5, fontStyle: 'italic',
+                        borderLeft: '3px solid var(--border)', paddingLeft: 10,
+                      }}>
+                        "{report.reviewSnippet || '—'}"
+                      </p>
+                      {/* Reason */}
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>
+                        <strong style={{ color: 'var(--text-2)' }}>Reason:</strong> {report.reason}
+                        {report.comment && (
+                          <span style={{ marginLeft: 6, color: 'var(--text-4)' }}>· "{report.comment}"</span>
+                        )}
+                      </div>
+                      {createdAt && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-4)', marginTop: 4 }}>
+                          Reported on {createdAt.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </div>
+                      )}
+                    </div>
+                    {/* Status badge */}
+                    <span style={{
+                      flexShrink: 0, padding: '3px 10px', borderRadius: 99,
+                      fontSize: '0.75rem', fontWeight: 700, textTransform: 'capitalize',
+                      background: statusColor.bg, color: statusColor.text, border: `1px solid ${statusColor.border}`,
+                    }}>
+                      {report.status || 'pending'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

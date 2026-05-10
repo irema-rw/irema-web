@@ -19,6 +19,7 @@ const TIME_FILTERS = [
 const SECTIONS = [
   { id:'businesses', label:'Business Reports', icon:'🏢' },
   { id:'users',      label:'User Reports',     icon:'👤' },
+  { id:'reviews',    label:'Review Reports',   icon:'💬' },
 ];
 
 export default function AdminReports() {
@@ -48,8 +49,10 @@ export default function AdminReports() {
 
   const filtered = reports.filter(r => {
     const type = r.targetType || r.type || 'business';
-    const matchSection = section==='businesses' ? type==='business'||type==='company' : type==='user';
-    const matchSearch = !search || (r.reason||'').toLowerCase().includes(search.toLowerCase()) || (r.reporterEmail||'').toLowerCase().includes(search.toLowerCase());
+    const matchSection = section==='businesses' ? (type==='business'||type==='company')
+      : section==='reviews' ? type==='review'
+      : type==='user';
+    const matchSearch = !search || (r.reason||'').toLowerCase().includes(search.toLowerCase()) || (r.reporterEmail||'').toLowerCase().includes(search.toLowerCase()) || (r.reviewSnippet||'').toLowerCase().includes(search.toLowerCase());
     const matchStatus = !statusFilter || (r.status||'pending')===statusFilter;
     const matchTime = !timeFilter.ms || (() => { const t=r.createdAt?.seconds?r.createdAt.seconds*1000:0; return Date.now()-t<=timeFilter.ms; })();
     return matchSection && matchSearch && matchStatus && matchTime;
@@ -58,6 +61,7 @@ export default function AdminReports() {
   const counts = {
     businesses: reports.filter(r=>{ const t=r.targetType||r.type||'business'; return t==='business'||t==='company'; }).length,
     users: reports.filter(r=>{ const t=r.targetType||r.type||'business'; return t==='user'; }).length,
+    reviews: reports.filter(r=> (r.targetType||r.type)==='review').length,
   };
   const pending = filtered.filter(r=>!r.status||r.status==='pending').length;
 
@@ -125,7 +129,7 @@ export default function AdminReports() {
           <thead>
             <tr>
               <th>{t('admin.reporter')||'Reporter'}</th>
-              <th>{section==='businesses'?'Business':'User'} Reported</th>
+              <th>{section==='reviews' ? 'Review' : section==='businesses' ? 'Business' : 'User'} Reported</th>
               <th>{t('admin.reason')||'Reason'}</th>
               <th>{t('admin.date')||'Date'}</th>
               <th>{t('admin.status')||'Status'}</th>
@@ -140,8 +144,18 @@ export default function AdminReports() {
             : filtered.map(r=>(
               <tr key={r.id} className="ap-tr-hover">
                 <td style={{fontSize:'0.82rem'}}>{r.reporterEmail||'Anonymous'}</td>
-                <td className="ap-td-bold">{r.targetName||r.businessName||r.userName||'—'}</td>
-                <td className="ap-td-truncate" style={{maxWidth:200}}>{r.reason||r.message||'—'}</td>
+                <td style={{maxWidth:260}}>
+                  {section==='reviews' ? (
+                    <div>
+                      <div style={{fontSize:'0.78rem',color:'var(--text-3)',marginBottom:2}}>{r.reviewerName||'—'} {'★'.repeat(r.reviewRating||0)}</div>
+                      <div className="ap-td-truncate" style={{fontSize:'0.82rem',fontStyle:'italic',color:'var(--text-2)'}}>"{r.reviewSnippet||'—'}"</div>
+                      {r.companyName && <div style={{fontSize:'0.75rem',color:'var(--text-4)',marginTop:2}}>📍 {r.companyName}</div>}
+                    </div>
+                  ) : (
+                    <span className="ap-td-bold">{r.targetName||r.businessName||r.userName||'—'}</span>
+                  )}
+                </td>
+                <td className="ap-td-truncate" style={{maxWidth:160}}>{r.reason||r.message||'—'}</td>
                 <td className="ap-td-date">{formatDate(r.createdAt)}</td>
                 <td>
                   <span className={`ap-badge ${r.status==='resolved'?'green':r.status==='escalated'?'red':'yellow'}`}>
@@ -182,12 +196,24 @@ export default function AdminReports() {
             <div className="ap-report-detail">
               <div className="ap-report-row"><span>Type</span><span className="ap-badge blue">{viewReport.targetType||viewReport.type||'business'}</span></div>
               <div className="ap-report-row"><span>{t('admin.reporter')||'Reporter'}</span><strong>{viewReport.reporterEmail||'Anonymous'}</strong></div>
-              <div className="ap-report-row"><span>Target</span><strong>{viewReport.targetName||viewReport.businessName||viewReport.userName||'—'}</strong></div>
+              {(viewReport.targetType||viewReport.type)==='review' ? (
+                <>
+                  <div className="ap-report-row"><span>Business</span><strong>{viewReport.companyName||'—'}</strong></div>
+                  <div className="ap-report-row"><span>Reviewer</span><strong>{viewReport.reviewerName||'—'} {'★'.repeat(viewReport.reviewRating||0)}</strong></div>
+                  <div className="ap-report-reason" style={{marginTop:8}}>
+                    <div className="ap-report-reason-label">Review Text</div>
+                    <p style={{fontStyle:'italic'}}>"{viewReport.reviewSnippet||'—'}"</p>
+                  </div>
+                </>
+              ) : (
+                <div className="ap-report-row"><span>Target</span><strong>{viewReport.targetName||viewReport.businessName||viewReport.userName||'—'}</strong></div>
+              )}
               <div className="ap-report-row"><span>{t('admin.date')||'Date'}</span><strong>{formatDate(viewReport.createdAt)}</strong></div>
               <div className="ap-report-row"><span>{t('admin.status')||'Status'}</span><span className={`ap-badge ${viewReport.status==='resolved'?'green':viewReport.status==='escalated'?'red':'yellow'}`}>{viewReport.status||'pending'}</span></div>
               <div className="ap-report-reason">
                 <div className="ap-report-reason-label">Reason / Message</div>
                 <p>{viewReport.reason||viewReport.message||'No reason provided'}</p>
+                {viewReport.comment && <p style={{color:'var(--text-3)',fontSize:'0.85rem',marginTop:6}}>"{viewReport.comment}"</p>}
               </div>
             </div>
             <div className="ap-modal-actions">
