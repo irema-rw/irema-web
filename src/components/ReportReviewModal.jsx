@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { db, collection, addDoc, serverTimestamp, query, where, getDocs } from '../firebase/config';
+import { db, serverTimestamp } from '../firebase/config';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useAuthStore } from '../store/authStore';
 
 const REASONS = [
@@ -25,20 +26,18 @@ export default function ReportReviewModal({ review, company, onClose, onSuccess 
     setSubmitting(true);
     setError('');
     try {
-      // Guard: one report per user per review
-      const existing = await getDocs(
-        query(collection(db, 'reports'),
-          where('reviewId', '==', review.id),
-          where('reportedBy', '==', user.uid)
-        )
-      );
-      if (!existing.empty) {
+      // Use a deterministic doc ID so one user can only ever have one report per review
+      const reportId = `${user.uid}_${review.id}`;
+      const reportRef = doc(db, 'reports', reportId);
+
+      const existing = await getDoc(reportRef);
+      if (existing.exists()) {
         setError('You have already reported this review.');
         setSubmitting(false);
         return;
       }
 
-      await addDoc(collection(db, 'reports'), {
+      await setDoc(reportRef, {
         targetType: 'review',
         reviewId: review.id,
         companyId: company?.id || review.companyId || '',
