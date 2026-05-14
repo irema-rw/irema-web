@@ -176,6 +176,8 @@ export default function UserDashboard() {
   const [editName, setEditName] = useState('');
   const [myReports, setMyReports] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(true);
+  const [myClaims, setMyClaims] = useState([]);
+  const [claimsLoading, setClaimsLoading] = useState(true);
 
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
@@ -190,7 +192,21 @@ export default function UserDashboard() {
     } catch(e) { showToast('Update failed: ' + e.message, 'error'); }
   }
 
-  useEffect(() => { if (user) { loadReviews(); loadMyReports(); } }, [user]);
+  useEffect(() => { if (user) { loadReviews(); loadMyReports(); loadMyClaims(); } }, [user]);
+
+  async function loadMyClaims() {
+    setClaimsLoading(true);
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'claims'),
+        where('claimantUserId', '==', user.uid)
+      ));
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setMyClaims(data);
+    } catch(e) { console.error(e); }
+    setClaimsLoading(false);
+  }
 
   async function loadMyReports() {
     setReportsLoading(true);
@@ -413,6 +429,79 @@ export default function UserDashboard() {
                 i18n={i18n}
               />
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── My Claims ── */}
+      <div className="container" style={{ marginTop: 40 }}>
+        <div className="ud-section-header">
+          <div>
+            <h2 className="ud-section-title">
+              My Business Claims
+              <span className="ud-section-count">{myClaims.length}</span>
+            </h2>
+            <p className="ud-section-sub">Track the status of your business ownership claims.</p>
+          </div>
+        </div>
+
+        {claimsLoading ? (
+          <LoadingSpinner />
+        ) : myClaims.length === 0 ? (
+          <div className="ud-empty card">
+            <div className="ud-empty-icon">🏢</div>
+            <h3>No claims submitted</h3>
+            <p>Visit the <a href="/businesses" style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}>Businesses page</a> to claim ownership of your business.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {myClaims.map(claim => {
+              const statusConfig = claim.status === 'approved'
+                ? { bg: '#f0faf6', text: '#1f6b52', border: '#bbf7d0', label: 'Approved' }
+                : claim.status === 'rejected'
+                ? { bg: '#fef2f2', text: '#dc2626', border: '#fecaca', label: 'Not Approved' }
+                : { bg: '#fffbeb', text: '#92400e', border: '#fde68a', label: 'Pending Review' };
+              const createdAt = claim.createdAt?.toDate
+                ? claim.createdAt.toDate()
+                : claim.createdAt?.seconds
+                ? new Date(claim.createdAt.seconds * 1000)
+                : null;
+
+              return (
+                <div key={claim.id} style={{
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 12, padding: '14px 16px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-1)', marginBottom: 4 }}>
+                      {claim.businessName || claim.companyName || '—'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>
+                      {claim.claimantRole && <span style={{ marginRight: 10 }}>Role: <strong style={{ color: 'var(--text-2)' }}>{claim.claimantRole}</strong></span>}
+                      {createdAt && <span>Submitted {createdAt.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                    </div>
+                    {claim.status === 'pending' && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-4)', marginTop: 4 }}>
+                        Our team typically reviews claims within 24 hours.
+                      </div>
+                    )}
+                    {claim.status === 'approved' && (
+                      <a href="/company-dashboard" style={{ fontSize: '0.78rem', color: 'var(--brand)', fontWeight: 600, textDecoration: 'none', marginTop: 4, display: 'inline-block' }}>
+                        Go to your dashboard →
+                      </a>
+                    )}
+                  </div>
+                  <span style={{
+                    flexShrink: 0, padding: '4px 12px', borderRadius: 99,
+                    fontSize: '0.75rem', fontWeight: 700,
+                    background: statusConfig.bg, color: statusConfig.text, border: `1px solid ${statusConfig.border}`,
+                  }}>
+                    {statusConfig.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
