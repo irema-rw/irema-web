@@ -314,8 +314,9 @@ service cloud.firestore {
     }
 
     match /reports/{reportId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.reportedBy == request.auth.uid);
-      // Doc ID is uid_reviewId — user can only create/read their own report doc
+      // Doc ID is uid_reviewId — user can read their own report by checking the ID prefix.
+      // We cannot use resource.data here because the doc may not exist yet (getDoc for dedup check).
+      allow read: if isAdmin() || (isSignedIn() && reportId.matches(request.auth.uid + '_.*'));
       allow create: if isSignedIn() && request.resource.data.reportedBy == request.auth.uid;
       allow update, delete: if isActiveAdmin();
     }
