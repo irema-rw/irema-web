@@ -21,5 +21,5 @@ export function requiresEmailVerification(user, userProfile = {}) {
   if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin') return false;
   if (userProfile?.emailVerificationRequired !== true) return false;
   if (!isPasswordUser(user, userProfile)) return false;
-  return user.emailVerified !== true && userProfile?.emailVerified !== true;
+  return user.emailVerified !== true;
 }

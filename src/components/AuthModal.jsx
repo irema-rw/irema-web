@@ -504,7 +504,22 @@ export default function AuthModal() {
   async function handleSubmitReview(e) {
     e.preventDefault();
     if (!user) { openModal('login'); return; }
-    if (requiresEmailVerification(user, useAuthStore.getState().userProfile)) {
+    const currentProfile = useAuthStore.getState().userProfile;
+    if (currentProfile?.emailVerificationRequired === true && auth.currentUser) {
+      try {
+        await reload(auth.currentUser);
+        await getIdToken(auth.currentUser, true);
+        useAuthStore.getState().setUser(auth.currentUser);
+        if (auth.currentUser.emailVerified && currentProfile?.emailVerified !== true) {
+          const updates = { emailVerified: true, emailVerifiedAt: serverTimestamp() };
+          await updateDoc(doc(db, 'users', auth.currentUser.uid), updates).catch(() => {});
+          useAuthStore.getState().setUserProfile({ ...currentProfile, ...updates });
+        }
+      } catch {
+        // If refresh fails, the verification gate below still protects the write.
+      }
+    }
+    if (requiresEmailVerification(auth.currentUser || user, useAuthStore.getState().userProfile)) {
       setError(EMAIL_VERIFICATION_REQUIRED_MESSAGE);
       return;
     }

@@ -37,6 +37,14 @@ test('does not require verification for admins', () => {
   }), false);
 });
 
+test('requires verification when Firebase Auth user is still unverified even if profile flag is true', () => {
+  assert.equal(requiresEmailVerification(passwordUser, {
+    authProvider: 'password',
+    emailVerificationRequired: true,
+    emailVerified: true,
+  }), true);
+});
+
 test('email verification action settings are omitted outside the browser', () => {
   assert.equal(getEmailVerificationActionCodeSettings(), undefined);
 });
