@@ -42,7 +42,8 @@ export default function AdminClaims() {
   async function updateStatus(id, status) {
     const claim = claims.find(c => c.id === id);
     await updateDoc(doc(db, 'claims', id), { status, resolvedAt: new Date(), resolvedBy: user?.email });
-    // If approved and we have company + user IDs, transfer business ownership
+
+    // Transfer ownership on approval
     if (status === 'approved' && claim?.companyId && claim?.claimantUserId) {
       try {
         await updateDoc(doc(db, 'companies', claim.companyId), {
@@ -53,11 +54,37 @@ export default function AdminClaims() {
         });
       } catch(e) { console.error('Ownership transfer failed:', e); }
     }
+
+    // In-app notification to claimant
+    if (claim?.claimantUserId) {
+      const isApproved = status === 'approved';
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          targetUserId: claim.claimantUserId,
+          type: isApproved ? 'claim_approved' : 'claim_rejected',
+          title: isApproved ? '🎉 Claim Approved' : 'Claim Not Approved',
+          message: isApproved
+            ? `Your ownership claim for ${claim.businessName || 'your business'} has been approved. You can now access your business dashboard.`
+            : `Your ownership claim for ${claim.businessName || 'your business'} could not be approved at this time. Please contact support for more information.`,
+          companyId: claim.companyId || null,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch(e) { console.error('Failed to send claim notification:', e); }
+
+      // Clean up pendingClaimId on rejection
+      if (status === 'rejected') {
+        try {
+          await updateDoc(doc(db, 'users', claim.claimantUserId), { pendingClaimId: null });
+        } catch(e) { console.error('Failed to clear pendingClaimId:', e); }
+      }
+    }
+
     setClaims(prev => prev.map(c => c.id === id ? { ...c, status } : c));
     try {
       await addDoc(collection(db, 'audit_logs'), {
         action: `claim_${status}`,
-        detail: `Claim ${id} ${status}`,
+        detail: `Claim ${id} ${status} — ${claim?.businessName || id}`,
         adminEmail: user?.email,
         adminId: user?.uid,
         timestamp: serverTimestamp(),

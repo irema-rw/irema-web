@@ -14,6 +14,7 @@ export default function QRScanPage() {
   const [result, setResult] = useState('');
   const [cameraStarted, setCameraStarted] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [noBarcodeDetector, setNoBarcodeDetector] = useState(false);
 
   // Auto-start camera on mount
   useEffect(() => {
@@ -23,18 +24,22 @@ export default function QRScanPage() {
 
   async function startCamera() {
     setError(''); setResult('');
+
+    if (!('BarcodeDetector' in window)) {
+      setNoBarcodeDetector(true);
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraStarted(true);
-        scanningRef.current = true;
-        scanFrame();
-      }
+      // videoRef is always in the DOM — no conditional check needed
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      setCameraStarted(true);
+      scanningRef.current = true;
+      scanFrame();
     } catch (e) {
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
         setPermissionDenied(true);
@@ -100,7 +105,23 @@ export default function QRScanPage() {
         </div>
 
         <div className="qrscan-card card">
-          {permissionDenied ? (
+          {/* video + canvas are always in the DOM so refs are available before cameraStarted is set */}
+          <div className="qrscan-viewport" style={{ display: cameraStarted ? 'block' : 'none' }}>
+            <video ref={videoRef} className="qrscan-video" playsInline muted />
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
+            <div className="qrscan-overlay">
+              <div className="qrscan-frame">
+                <div className="qrf-corner tl" /><div className="qrf-corner tr" />
+                <div className="qrf-corner bl" /><div className="qrf-corner br" />
+              </div>
+              <p className="qrscan-hint">Align QR code within the frame</p>
+            </div>
+            <button className="btn btn-ghost btn-sm qrscan-stop" onClick={stopCamera}>
+              Stop Camera
+            </button>
+          </div>
+
+          {permissionDenied && (
             <div className="qrscan-start">
               <div className="qrscan-icon">🔒</div>
               <h3>Camera Access Required</h3>
@@ -110,7 +131,9 @@ export default function QRScanPage() {
               </button>
               {error && <div className="alert alert-error" style={{ marginTop: 16 }}>{error}</div>}
             </div>
-          ) : !cameraStarted && !result ? (
+          )}
+
+          {!cameraStarted && !result && !permissionDenied && (
             <div className="qrscan-start">
               <div className="qrscan-icon">📷</div>
               <h3>Starting camera…</h3>
@@ -124,22 +147,13 @@ export default function QRScanPage() {
                 </>
               )}
             </div>
-          ) : cameraStarted ? (
-            <div className="qrscan-viewport">
-              <video ref={videoRef} className="qrscan-video" playsInline muted />
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
-              <div className="qrscan-overlay">
-                <div className="qrscan-frame">
-                  <div className="qrf-corner tl" /><div className="qrf-corner tr" />
-                  <div className="qrf-corner bl" /><div className="qrf-corner br" />
-                </div>
-                <p className="qrscan-hint">Align QR code within the frame</p>
-              </div>
-              <button className="btn btn-ghost btn-sm qrscan-stop" onClick={stopCamera}>
-                Stop Camera
-              </button>
+          )}
+
+          {noBarcodeDetector && cameraStarted && (
+            <div className="alert alert-error" style={{ margin: '12px 16px 0' }}>
+              ⚠️ QR scanning is not supported in this browser. Please use Chrome or Edge for full functionality.
             </div>
-          ) : null}
+          )}
 
           {result && !cameraStarted && (
             <div className="qrscan-result">
