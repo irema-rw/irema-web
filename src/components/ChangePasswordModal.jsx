@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { auth } from '../firebase/config';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { getAuthErrorMessage } from '../utils/authErrors';
 
 /**
  * Unified Change Password Modal — used across User, Business, and Admin portals.
@@ -51,10 +52,8 @@ export default function ChangePasswordModal({ onClose, theme }) {
     } catch (err) {
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError('Current password is incorrect. Please try again.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError(err.message);
+        setError(getAuthErrorMessage(err));
       }
     }
     setSaving(false);

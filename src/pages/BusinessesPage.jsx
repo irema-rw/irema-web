@@ -10,6 +10,7 @@ import { useThemeStore } from '../store/themeStore';
 import { useTranslation } from 'react-i18next';
 import { ensureUniqueSlug } from '../utils/slug';
 import { getEmailVerificationActionCodeSettings } from '../utils/emailVerification';
+import { getAuthErrorMessage } from '../utils/authErrors';
 import { resolveAuthFlow } from '../components/AuthRedirectHandler';
 import './BusinessesPage.css';
 
@@ -202,7 +203,7 @@ export default function BusinessesPage() {
         return;
       }
     } catch (err) {
-      setLoginErr(err?.message || 'Google sign-in failed.');
+      setLoginErr(getAuthErrorMessage(err));
     } finally { setLoginLoading(false); }
   }
 
@@ -225,8 +226,7 @@ export default function BusinessesPage() {
         setLoginErr('No business found for this account. Please register or claim a business.');
       }
     } catch(err) {
-      setLoginErr(err.code==='auth/invalid-credential'||err.code==='auth/wrong-password'
-        ? 'Invalid email or password.' : err.message);
+      setLoginErr(getAuthErrorMessage(err));
     }
     setLoginLoading(false);
   }
@@ -240,7 +240,7 @@ export default function BusinessesPage() {
       };
       await sendPasswordResetEmail(auth, loginForm.email, actionCodeSettings);
       setResetSent(true);
-    } catch(e) { setLoginErr(e.message); }
+    } catch(e) { setLoginErr(getAuthErrorMessage(e)); }
   }
 
   // REGISTER NEW BUSINESS
@@ -354,8 +354,7 @@ export default function BusinessesPage() {
       navigate('/company-dashboard', { replace: true });
     } catch(err) {
       isRegisteringRef.current = false;
-      setRegErr(err.code==='auth/email-already-in-use'
-        ? 'This email is already registered. Try logging in.' : err.message);
+      setRegErr(getAuthErrorMessage(err));
     }
     setRegLoading(false);
   }
@@ -451,7 +450,7 @@ export default function BusinessesPage() {
       // Do NOT navigate to company-dashboard — wait for admin approval
     } catch(err) {
       console.error('Claim error:', err);
-      setClaimErr(err.message || 'Something went wrong. Please try again.');
+      setClaimErr(getAuthErrorMessage(err));
     } finally {
       setClaimLoading(false);
       isClaimingRef.current = false;

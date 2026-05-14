@@ -24,6 +24,7 @@ import {
   getEmailVerificationActionCodeSettings,
   requiresEmailVerification,
 } from '../utils/emailVerification';
+import { getAuthErrorMessage } from '../utils/authErrors';
 import { resolveAuthFlow } from './AuthRedirectHandler';
 import { useNavigate } from 'react-router-dom';
 
@@ -290,7 +291,7 @@ export default function AuthModal() {
         return;
       }
     } catch (e) {
-      setError(e?.message || 'Google sign-in failed');
+      setError(getAuthErrorMessage(e));
     } finally { setLoading(false); }
   }
 
@@ -314,13 +315,7 @@ export default function AuthModal() {
       await sendPasswordResetEmail(auth, forgotEmail.trim(), actionCodeSettings);
       setForgotSent(true);
     } catch(err) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email') {
-        setError('We couldn\'t find an account with that email. Please check the address and try again.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many attempts. Please wait a few minutes before trying again.');
-      } else {
-        setError('Something went wrong. Please try again or contact support@irema.rw');
-      }
+      setError(getAuthErrorMessage(err));
     }
     setForgotLoading(false);
   }
@@ -360,7 +355,7 @@ export default function AuthModal() {
       }
       closeModal();
     } catch (e) {
-      setError(e.code === 'auth/invalid-credential' ? 'Invalid email or password' : e.message);
+      setError(getAuthErrorMessage(e));
     } finally { setLoading(false); }
   }
 
@@ -402,11 +397,7 @@ export default function AuthModal() {
       useAuthStore.getState().setUserProfile(profileData);
       showVerificationNotice(trimmedEmail);
     } catch (e) {
-      if (e.code === 'auth/email-already-in-use') {
-        setError('This email is already registered. Try logging in, or use a different email.');
-      } else {
-        setError(e.message);
-      }
+      setError(getAuthErrorMessage(e));
     } finally { setLoading(false); }
   }
 
