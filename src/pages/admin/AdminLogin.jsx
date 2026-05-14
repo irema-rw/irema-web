@@ -6,6 +6,7 @@ import { signInWithEmailAndPassword, onAuthStateChanged, updatePassword, setPers
 import { doc, getDoc } from 'firebase/firestore';
 import './AdminLogin.css';
 import { LANGUAGES } from '../../constants/languages';
+import { getAuthErrorMessage } from '../../utils/authErrors';
 
 async function verifyLoginTOTP(secret, code) {
   const period = 30;
@@ -121,7 +122,7 @@ export default function AdminLogin() {
       setError(
         err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password'
           ? (t('admin_login.error_invalid') || 'Invalid email or password. Please try again.')
-          : (t('admin_login.error_generic') || err.message)
+          : getAuthErrorMessage(err)
       );
     }
     setLoading(false);
@@ -158,7 +159,7 @@ export default function AdminLogin() {
       await updateDoc(fsDoc(db, 'admin_users', tempUser.uid), { mustChangePassword: false });
       navigate('/admin');
     } catch(err) {
-      setError(err.message);
+      setError(getAuthErrorMessage(err));
     }
     setChangingPw(false);
   }

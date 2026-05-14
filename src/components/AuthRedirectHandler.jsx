@@ -64,6 +64,9 @@ export async function resolveAuthFlow({ user, intent, navigate }) {
       email: user.email,
       photoURL: user.photoURL,
       role: 'user',
+      authProvider: 'google',
+      emailVerificationRequired: false,
+      emailVerified: true,
       createdAt: serverTimestamp(),
     });
   }

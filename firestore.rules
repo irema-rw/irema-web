@@ -23,6 +23,13 @@ service cloud.firestore {
         get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.isActive == true;
     }
 
+    function isEmailVerifiedOrGrandfathered() {
+      return isActiveAdmin() ||
+        request.auth.token.email_verified == true ||
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.emailVerificationRequired != true;
+    }
+
     function ownsCompany(companyId) {
       return isSignedIn() &&
         companyId != null &&
@@ -101,6 +108,45 @@ service cloud.firestore {
         request.resource.data.trialEndsAt <= request.time + duration.value(15, 'd');
     }
 
+    function isValidReviewComment(data) {
+      return data.comment is string &&
+        data.comment.size() >= 10 &&
+        data.comment.size() <= 1000;
+    }
+
+    function reviewLimitPath(companyId, uid) {
+      return /databases/$(database)/documents/review_limits/$(companyId + '_' + uid);
+    }
+
+    function isReviewCooldownOpen(data) {
+      return !exists(reviewLimitPath(data.companyId, request.auth.uid)) ||
+        get(reviewLimitPath(data.companyId, request.auth.uid)).data.lastReviewedAt + duration.value(24, 'h') <= request.time;
+    }
+
+    function hasMatchingReviewLimitAfter(reviewId, data) {
+      return existsAfter(reviewLimitPath(data.companyId, request.auth.uid)) &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.companyId == data.companyId &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.userId == request.auth.uid &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.lastReviewId == reviewId &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.lastReviewedAt == request.time &&
+        getAfter(reviewLimitPath(data.companyId, request.auth.uid)).data.updatedAt == request.time;
+    }
+
+    function isValidReviewLimitWrite(docId) {
+      return request.resource.data.keys().hasOnly([
+          'companyId', 'userId', 'lastReviewedAt', 'lastReviewId', 'updatedAt'
+        ]) &&
+        docId == request.resource.data.companyId + '_' + request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.companyId is string &&
+        request.resource.data.lastReviewId is string &&
+        request.resource.data.lastReviewedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        existsAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)) &&
+        getAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)).data.companyId == request.resource.data.companyId &&
+        getAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)).data.userId == request.auth.uid;
+    }
+
     function companyHasPaidFeatureAccess(companyId) {
       return exists(/databases/$(database)/documents/companies/$(companyId)) &&
         get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionId is string &&
@@ -164,10 +210,18 @@ service cloud.firestore {
       // Pin the reviewer's userId to the auth uid so a signed-in user can't
       // forge a review attributed to someone else.
       allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid;
+        && isEmailVerifiedOrGrandfathered()
+        && request.resource.data.userId == request.auth.uid
+        && isValidReviewComment(request.resource.data)
+        && isReviewCooldownOpen(request.resource.data)
+        && hasMatchingReviewLimitAfter(reviewId, request.resource.data);
       allow update: if isSignedIn() && (
         // Author can edit their own review
-        request.auth.uid == resource.data.userId ||
+        (request.auth.uid == resource.data.userId &&
+          (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['comment']) ||
+            isValidReviewComment(request.resource.data)
+          )) ||
         // Company owner can add replies to reviews of their own business
         (request.resource.data.replies != null &&
           exists(/databases/$(database)/documents/companies/$(resource.data.companyId)) &&
@@ -184,13 +238,22 @@ service cloud.firestore {
       // Pin userId on create so users can't attribute reactions to someone
       // else.
       allow create: if isSignedIn()
+        && isEmailVerifiedOrGrandfathered()
         && request.resource.data.userId == request.auth.uid;
       // On update, the existing doc must already be the user's AND they
       // must not flip the userId to someone else's uid.
       allow update: if isSignedIn()
+        && isEmailVerifiedOrGrandfathered()
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow delete: if isSignedIn() && isEmailVerifiedOrGrandfathered() && request.auth.uid == resource.data.userId;
+    }
+
+    match /review_limits/{docId} {
+      allow get: if isSignedIn() && docId.matches('^.+_' + request.auth.uid + '$');
+      allow list: if false;
+      allow create, update: if isSignedIn() && isValidReviewLimitWrite(docId);
+      allow delete: if false;
     }
 
     match /notifications/{notifId} {
@@ -304,20 +367,28 @@ service cloud.firestore {
 
     match /company_stories/{storyId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isEmailVerifiedOrGrandfathered();
       allow update: if isSignedIn() && (
-        request.auth.uid == resource.data.addedBy || isAdmin()
+        isAdmin() ||
+        (isEmailVerifiedOrGrandfathered() && request.auth.uid == resource.data.addedBy)
       );
       allow delete: if isActiveAdmin() || (
-        isSignedIn() && request.auth.uid == resource.data.addedBy
+        isSignedIn() && isEmailVerifiedOrGrandfathered() && request.auth.uid == resource.data.addedBy
       );
     }
 
     match /reports/{reportId} {
       // Doc ID is uid_reviewId — user can read their own report by checking the ID prefix.
       // We cannot use resource.data here because the doc may not exist yet (getDoc for dedup check).
-      allow read: if isAdmin() || (isSignedIn() && reportId.matches(request.auth.uid + '_.*'));
-      allow create: if isSignedIn() && request.resource.data.reportedBy == request.auth.uid;
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          reportId.matches(request.auth.uid + '_.*') ||
+          resource.data.reportedBy == request.auth.uid
+        )
+      );
+      allow create: if isSignedIn()
+        && isEmailVerifiedOrGrandfathered()
+        && request.resource.data.reportedBy == request.auth.uid;
       allow update, delete: if isActiveAdmin();
     }
 
@@ -327,6 +398,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && (
         isAdmin() ||
         (request.resource.data.companyId != null &&
+          isEmailVerifiedOrGrandfathered() &&
           exists(/databases/$(database)/documents/companies/$(request.resource.data.companyId)) &&
           get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.adminUserId == request.auth.uid)
       );
@@ -337,6 +409,7 @@ service cloud.firestore {
         isAdmin() ||
         (request.auth.uid == resource.data.ownerId) ||
         (resource.data.companyId != null &&
+          isEmailVerifiedOrGrandfathered() &&
           exists(/databases/$(database)/documents/companies/$(resource.data.companyId)) &&
           get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.adminUserId == request.auth.uid)
       );
@@ -344,6 +417,7 @@ service cloud.firestore {
         isAdmin() ||
         (request.auth.uid == resource.data.ownerId) ||
         (resource.data.companyId != null &&
+          isEmailVerifiedOrGrandfathered() &&
           exists(/databases/$(database)/documents/companies/$(resource.data.companyId)) &&
           get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.adminUserId == request.auth.uid)
       );
@@ -379,7 +453,7 @@ service cloud.firestore {
             get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.adminUserId == request.auth.uid)
         )
       );
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isEmailVerifiedOrGrandfathered();
       allow update: if isActiveAdmin();
       allow delete: if isActiveAdmin();
     }
@@ -420,29 +494,29 @@ service cloud.firestore {
 
     match /blog_views/{docId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isEmailVerifiedOrGrandfathered();
       allow update: if false;
       allow delete: if isAdmin();
     }
 
     match /blog_likes/{docId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isEmailVerifiedOrGrandfathered();
       allow update: if false;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid || isAdmin();
+      allow delete: if (isSignedIn() && isEmailVerifiedOrGrandfathered() && resource.data.userId == request.auth.uid) || isAdmin();
     }
 
     match /blog_comments/{docId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid || isAdmin();
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid || isAdmin();
+      allow create: if isSignedIn() && isEmailVerifiedOrGrandfathered();
+      allow update: if (isSignedIn() && isEmailVerifiedOrGrandfathered() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow delete: if (isSignedIn() && isEmailVerifiedOrGrandfathered() && resource.data.userId == request.auth.uid) || isAdmin();
     }
 
     match /support_chats/{chatId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isEmailVerifiedOrGrandfathered() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (isAdmin() || (isEmailVerifiedOrGrandfathered() && resource.data.userId == request.auth.uid));
       allow delete: if isAdmin();
     }
 

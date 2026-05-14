@@ -9,6 +9,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { getCategoryLabel, formatRelativeTime, getRatingColor, getRatingLabel, getInitials } from '../utils/helpers';
 import { sanitizeUrl } from '../utils/security';
 import { slugify, ensureUniqueSlug, findCompanyBySlug, companyPath } from '../utils/slug';
+import { validateReplyText } from '../utils/reviewLimits';
 import './CompanyPage.css';
 import StoriesSection from '../components/StoriesSection';
 import ReportReviewModal from '../components/ReportReviewModal';
@@ -38,6 +39,7 @@ export default function CompanyPage() {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [showQr, setShowQr] = useState(false);
   const [replyText, setReplyText] = useState({});
+  const [replyError, setReplyError] = useState('');
   const [submittingReply, setSubmittingReply] = useState(null);
   const [isBusinessOwner, setIsBusinessOwner] = useState(false);
   // Review modal state
@@ -233,11 +235,16 @@ export default function CompanyPage() {
 
   async function submitReply(reviewId, isBusinessReply = false) {
     const text = replyText[reviewId];
-    if (!text?.trim() || !user) return;
+    if (!user) return;
+    const validation = validateReplyText(text);
+    if (!validation.ok) {
+      setReplyError(validation.message);
+      return;
+    }
     setSubmittingReply(reviewId);
     try {
       const review = reviews.find(r => r.id === reviewId);
-      const newReply = { by: isBusinessReply ? 'business' : 'user', text, userId: user.uid,
+      const newReply = { by: isBusinessReply ? 'business' : 'user', text: text.trim(), userId: user.uid,
         userName: user.displayName || user.email, when: new Date() };
       const updatedReplies = [...(review.replies || []), newReply];
       await updateDoc(doc(db, 'reviews', reviewId), { replies: updatedReplies });
@@ -245,6 +252,7 @@ export default function CompanyPage() {
       setReviews(updated);
       if (activeReview?.id === reviewId) setActiveReview({ ...activeReview, replies: updatedReplies });
       setReplyText(prev => ({ ...prev, [reviewId]: '' }));
+      setReplyError('');
     } catch (e) { console.error(e); }
     setSubmittingReply(null);
   }
@@ -654,7 +662,11 @@ export default function CompanyPage() {
         <ReviewModal
           review={activeReview}
           replyText={replyText[activeReview.id]||''}
-          onReplyChange={v => setReplyText(p=>({...p,[activeReview.id]:v}))}
+          replyError={replyError}
+          onReplyChange={v => {
+            setReplyText(p=>({...p,[activeReview.id]:v}));
+            setReplyError(v.length > 1000 ? 'Replies can be at most 1000 characters.' : '');
+          }}
           onReplySubmit={() => submitReply(activeReview.id, isBusinessOwner)}
           submitting={submittingReply===activeReview.id}
           reactions={reactions[activeReview.id]}
@@ -769,7 +781,7 @@ function ReviewWidget({ review, reactions, myReaction, isTranslating, translated
 }
 
 /* ── Review Modal ── */
-function ReviewModal({ review, user, isBusinessOwner, replyText, onReplyChange, onReplySubmit, submitting, reactions, myReaction, onReact, translated, isTranslating, onTranslate, onImageClick, onClose, t, lang }) {
+function ReviewModal({ review, user, isBusinessOwner, replyText, replyError, onReplyChange, onReplySubmit, submitting, reactions, myReaction, onReact, translated, isTranslating, onTranslate, onImageClick, onClose, t, lang }) {
   const name = review.userName || 'Anonymous';
   const color = avatarColor(name);
   const comment = translated || review.comment || '';
@@ -868,16 +880,21 @@ function ReviewModal({ review, user, isBusinessOwner, replyText, onReplyChange, 
                 placeholder={isBusinessOwner ? 'Write your business response…' : 'Write a comment…'}
                 value={replyText}
                 onChange={e=>onReplyChange(e.target.value)}
-                onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&onReplySubmit()}
+                onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();onReplySubmit();}}}
               />
               <button
                 className={`btn btn-sm ${isBusinessOwner?'btn-primary':'btn-outline'}`}
                 onClick={onReplySubmit}
-                disabled={submitting||!replyText.trim()}
+                disabled={submitting||!replyText.trim()||replyText.length > 1000}
               >
                 {submitting?'…':t('review.reply')}
               </button>
             </div>
+            {replyError && (
+              <div style={{marginTop:8,fontSize:'0.78rem',color:'#ef4444',fontWeight:600}}>
+                {replyError}
+              </div>
+            )}
           </div>
         )}
       </div>
