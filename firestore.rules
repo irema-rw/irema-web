@@ -378,8 +378,17 @@ service cloud.firestore {
     }
 
     match /reports/{reportId} {
-      allow read: if isAdmin();
-      allow create: if isSignedIn() && isEmailVerifiedOrGrandfathered();
+      // Doc ID is uid_reviewId — user can read their own report by checking the ID prefix.
+      // We cannot use resource.data here because the doc may not exist yet (getDoc for dedup check).
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          reportId.matches(request.auth.uid + '_.*') ||
+          resource.data.reportedBy == request.auth.uid
+        )
+      );
+      allow create: if isSignedIn()
+        && isEmailVerifiedOrGrandfathered()
+        && request.resource.data.reportedBy == request.auth.uid;
       allow update, delete: if isActiveAdmin();
     }
 

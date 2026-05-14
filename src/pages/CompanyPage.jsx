@@ -12,6 +12,7 @@ import { slugify, ensureUniqueSlug, findCompanyBySlug, companyPath } from '../ut
 import { validateReplyText } from '../utils/reviewLimits';
 import './CompanyPage.css';
 import StoriesSection from '../components/StoriesSection';
+import ReportReviewModal from '../components/ReportReviewModal';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
@@ -51,6 +52,9 @@ export default function CompanyPage() {
   // Translation per review
   const [translated, setTranslated] = useState({}); // { reviewId: text }
   const [translating, setTranslating] = useState({});
+  // Reporting
+  const [reportModal, setReportModal] = useState(null); // review object | null
+  const [reportedReviews, setReportedReviews] = useState(new Set()); // reviewIds the current user already reported
 
   useEffect(() => { const u = onAuthStateChanged(auth, setUser); return u; }, []);
 
@@ -332,6 +336,22 @@ export default function CompanyPage() {
     }
   }
 
+  // Load which reviews the current user has already reported (so we can disable the flag button)
+  useEffect(() => {
+    if (!user || !company?.id) return;
+    getDocs(query(collection(db, 'reports'),
+      where('reportedBy', '==', user.uid),
+      where('companyId', '==', company.id)
+    )).then(snap => {
+      setReportedReviews(new Set(snap.docs.map(d => d.data().reviewId)));
+    }).catch(() => {});
+  }, [user?.uid, company?.id]);
+
+  function handleReportSuccess(reviewId) {
+    setReportedReviews(prev => new Set([...prev, reviewId]));
+    setReportModal(null);
+  }
+
   const sortedReviews = [...reviews].sort((a, b) => {
     if (sortBy === 'newest') return (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0);
     if (sortBy === 'highest') return (b.rating||0) - (a.rating||0);
@@ -487,6 +507,9 @@ export default function CompanyPage() {
                   onOpen={() => setActiveReview(review)}
                   onReact={(type) => handleReaction(review.id, type)}
                   onTranslate={() => translateReview(review.id, review.comment)}
+                  canReport={!!user && review.userId !== user.uid}
+                  isReported={reportedReviews.has(review.id)}
+                  onReport={() => setReportModal(review)}
                   t={t}
                   lang={i18n.language}
                 />
@@ -669,12 +692,20 @@ export default function CompanyPage() {
           onClose={()=>setLightboxImg(null)}
         />
       )}
+      {reportModal && (
+        <ReportReviewModal
+          review={reportModal}
+          company={company}
+          onClose={() => setReportModal(null)}
+          onSuccess={handleReportSuccess}
+        />
+      )}
     </div>
   );
 }
 
 /* ── Review Widget (Yelp-style card) ── */
-function ReviewWidget({ review, reactions, myReaction, isTranslating, translatedText, onOpen, onReact, onTranslate, t, lang }) {
+function ReviewWidget({ review, reactions, myReaction, isTranslating, translatedText, onOpen, onReact, onTranslate, canReport, isReported, onReport, t, lang }) {
   const name = review.userName || 'Anonymous';
   const comment = translatedText || review.comment || '';
   const short = comment.length > 120 ? comment.slice(0,120)+'…' : comment;
@@ -725,9 +756,25 @@ function ReviewWidget({ review, reactions, myReaction, isTranslating, translated
             {isTranslating ? '…' : ''}
           </button>
         </div>
-        {(review.replies?.length>0) && (
-          <span className="rw-reply-count">💬 {review.replies.length}</span>
-        )}
+        <div style={{display:'flex',alignItems:'center',gap:8}} onClick={e=>e.stopPropagation()}>
+          {(review.replies?.length>0) && (
+            <span className="rw-reply-count">💬 {review.replies.length}</span>
+          )}
+          {canReport && (
+            <button
+              className="rw-react-btn"
+              title={isReported ? 'Already reported' : 'Report this review'}
+              disabled={isReported}
+              onClick={onReport}
+              style={{ opacity: isReported ? 0.5 : 1, color: isReported ? 'var(--text-4)' : undefined }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={isReported ? 'currentColor' : '#ef4444'} strokeWidth="2" strokeLinecap="round">
+                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+              </svg>
+              {isReported ? 'Reported' : ''}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
