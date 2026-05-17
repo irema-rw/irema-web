@@ -62,22 +62,6 @@ export default function ContactPage() {
           <p style={{ color: 'var(--text-3)' }}>We're here to help. Reach out and we'll respond within 24 hours.</p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 40 }}>
-          {[
-            ['📧', 'General', 'hello@irema.rw'],
-            ['🛟', 'Support', 'support@irema.rw'],
-            ['🏢', 'Business', 'daniel.kamali@irema.rw'],
-            ['⚖️', 'Legal', 'legal@irema.rw'],
-          ].map(([icon, label, email]) => (
-            <a key={label} href={`mailto:${email}`} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', textDecoration: 'none', transition: 'all 0.2s ease', cursor: 'pointer', hover: { borderColor: 'var(--brand)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } }}>
-              <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>{icon}</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-1)' }}>{label}</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--brand)', wordBreak: 'break-word' }}>{email}</div>
-              </div>
-            </a>
-          ))}
-        </div>
 
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '32px 28px' }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-1)', marginBottom: 20 }}>Send a Message</h2>
@@ -85,7 +69,7 @@ export default function ContactPage() {
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
               <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>✅</div>
               <h3 style={{ color: 'var(--brand)', marginBottom: 8 }}>Message Ready!</h3>
-              <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>Your email client should open. If not, email us at hello@irema.rw</p>
+              <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>Your email client should open. If not, please try again.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit}>

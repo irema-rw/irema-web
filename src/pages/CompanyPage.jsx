@@ -135,6 +135,14 @@ export default function CompanyPage() {
       if (routeSlug) {
         // Primary path: look up the company by its stored slug.
         resolved = await findCompanyBySlug(routeSlug);
+        if (!resolved) {
+          // Fallback: if slug lookup fails, try to load it as a direct ID
+          // (handles cases where slug query fails or user is on legacy ID URL)
+          try {
+            const snap = await getDoc(doc(db, 'companies', routeSlug));
+            if (snap.exists()) resolved = { id: snap.id, ...snap.data() };
+          } catch (e) { /* ignore */ }
+        }
       }
       if (!resolved && routeId) {
         // Legacy path: /company/:id. Load by id, canonicalise later.
@@ -426,8 +434,14 @@ export default function CompanyPage() {
                 </div>
                 <div className="company-rating-row">
                   <StarRating rating={avgRating} size={20} />
-                  <span className="company-rating-num" style={{color:ratingColor}}>{avgRating.toFixed(1)}</span>
-                  <span className="company-rating-label" style={{color:ratingColor}}>{ratingLabel}</span>
+                  {reviews.length === 0 ? (
+                    <span className="company-rating-label" style={{color:ratingColor}}>No rating yet</span>
+                  ) : (
+                    <>
+                      <span className="company-rating-num" style={{color:ratingColor}}>{avgRating.toFixed(1)}</span>
+                      <span className="company-rating-label" style={{color:ratingColor}}>{ratingLabel}</span>
+                    </>
+                  )}
                   <span className="company-rating-count">· {reviews.length} {t('company.total_reviews')}</span>
                 </div>
               </div>

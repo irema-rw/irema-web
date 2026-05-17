@@ -25,15 +25,32 @@ export function slugify(input) {
 /**
  * Look up a company document by its slug.
  * Returns { id, ...data } or null.
+ * Includes retry logic for potential timing issues.
  */
 export async function findCompanyBySlug(slug) {
   if (!slug) return null;
-  const snap = await getDocs(
-    query(collection(db, 'companies'), where('slug', '==', slug), fbLimit(1))
-  );
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  return { id: d.id, ...d.data() };
+
+  // Try up to 3 times with exponential backoff to handle replication delays
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'companies'), where('slug', '==', slug), fbLimit(1))
+      );
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        return { id: d.id, ...d.data() };
+      }
+    } catch (e) {
+      console.warn(`Slug lookup attempt ${attempt} failed:`, e.message);
+    }
+
+    // Backoff before retry: 500ms, then 1000ms
+    if (attempt < 3) {
+      await new Promise(r => setTimeout(r, attempt === 1 ? 500 : 1000));
+    }
+  }
+
+  return null;
 }
 
 /**

@@ -131,6 +131,19 @@ export default function BusinessesPage() {
     }
   }, []);
 
+  // Populate registration form when Google user is selected via popup
+  useEffect(() => {
+    if (regGoogleUser && modal === 'register') {
+      setRegForm(f => ({
+        ...f,
+        email: regGoogleUser.email || '',
+        firstName: (regGoogleUser.displayName || '').split(' ')[0],
+        lastName: (regGoogleUser.displayName || '').split(' ').slice(1).join(' '),
+        password: '',
+      }));
+    }
+  }, [regGoogleUser, modal]);
+
   useEffect(() => {
     return onAuthStateChanged(auth, async u => {
       // While registration or claim is in progress, never interfere with auth state
@@ -798,11 +811,11 @@ export default function BusinessesPage() {
                   <input className="bp-input" type="tel" placeholder="Phone number (+250…)" value={regForm.phoneNumber} onChange={setReg('phoneNumber')}/>
                   <input className="bp-input" type="url" placeholder="Website URL (optional)" value={regForm.website} onChange={setReg('website')}/>
                   {/* Location fields */}
-                  <input className="bp-input" placeholder="Street address (optional)" value={regForm.address} onChange={setReg('address')} style={{gridColumn:'1/-1'}}/>
+                  <input className="bp-input" placeholder="Street address" value={regForm.address} onChange={setReg('address')} style={{gridColumn:'1/-1'}}/>
                   <input className="bp-input" placeholder="City / Town *" required value={regForm.city} onChange={setReg('city')}/>
                   <select className="bp-input" value={regForm.district} onChange={setReg('district')}>
                     <option value="">District (optional)</option>
-                    {['Gasabo','Kicukiro','Nyarugenge','Bugesera','Gatsibo','Kayonza','Kirehe','Masenyi','Ngoma','Nyagatare','Rwagamana','Burera','Gakenke','Gicumbi','Musanze','Rulindo','Gisagara','Huye','Kamonyi','Muhanga','Nyamagabe','Nyanza','Nyaruguru','Ruhango','Karongi','Ngororero','Nyabihu','Nyamasheke','Rubavu','Rusizi','Rutsiro','Rwanguve'].map(d=>
+                    {['Gasabo','Kicukiro','Nyarugenge','Bugesera','Gatsibo','Kayonza','Kirehe','Ngoma','Nyagatare','Rwagamana','Burera','Gakenke','Gicumbi','Musanze','Rulindo','Gisagara','Huye','Kamonyi','Muhanga','Nyamagabe','Nyanza','Nyaruguru','Ruhango','Karongi','Ngororero','Nyabihu','Nyamasheke','Rubavu','Rusizi','Rutsiro'].map(d=>
                       <option key={d} value={d}>{d}</option>
                     )}
                   </select>
