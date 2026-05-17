@@ -640,19 +640,47 @@
 textarea.ap-input { resize: vertical; line-height: 1.6; }
 
 /* ── Responsive tables ── */
-@media (max-width: 768px) {
-  .ap-table { font-size: 0.78rem; }
+@media (max-width: 1024px) {
+  /* Prevent any admin content from causing horizontal page scroll */
+  .ap-table-wrap { overflow-x: auto; max-width: 100%; }
+  .ap-table { font-size: 0.78rem; min-width: 560px; }
   .ap-table th, .ap-table td { padding: var(--sp-3) var(--sp-3); }
   .ap-td-truncate { max-width: 100px; }
-  .ap-toolbar-multi { flex-direction: column; align-items: stretch; }
-  .ap-toolbar-multi .ap-table-search { width: 100%; }
+
+  /* Stack filter toolbars vertically */
+  .ap-toolbar-multi { flex-direction: column; align-items: stretch; gap: 8px; }
+  .ap-toolbar-multi .ap-table-search { max-width: 100%; width: 100%; }
+  .ap-filter-select { width: 100%; }
+
+  /* Charts collapse to single column */
   .ap-charts-grid { grid-template-columns: 1fr !important; }
+
+  /* Stats grid: 2 columns */
+  .ap-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .ap-stats-grid-5 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Modals full-width */
   .ap-modal { margin: 16px; padding: var(--sp-5); }
+
+  /* Page headers */
   .ap-page-header { flex-direction: column; align-items: flex-start; gap: var(--sp-3); }
   .ap-header-actions { flex-wrap: wrap; }
+
+  /* Period/tab rows scroll horizontally instead of wrapping badly */
+  .ap-period-tabs { overflow-x: auto; padding-bottom: 4px; }
+  .ap-status-tabs { overflow-x: auto; padding-bottom: 4px; }
+  .ap-settings-tabs { overflow-x: auto; }
+  .ap-tabs-row { overflow-x: auto; padding-bottom: 4px; }
+
+  /* Review sub-rows: stack on narrow */
+  .ap-review-sub-row { grid-template-columns: 1fr auto; padding-left: 20px; }
+  .ap-review-detail-row { grid-template-columns: 1fr auto; }
 }
-@media (max-width: 1024px) {
-  .ap-charts-grid { grid-template-columns: 1fr !important; }
+
+@media (max-width: 768px) {
+  .ap-table { font-size: 0.75rem; }
+  .ap-table th, .ap-table td { padding: var(--sp-2) var(--sp-2); }
+  .ap-td-truncate { max-width: 80px; }
 }
 
 /* ── Dark mode: secondary/ghost buttons become green-tinted ── */
@@ -1001,7 +1029,7 @@ textarea.ap-input { resize: vertical; line-height: 1.6; }
 }
 [data-theme="dark"] .ap-error-box { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171; }
 
-/* ── Admin modal mobile responsive ── */
+/* ── Admin modal + small screen responsive ── */
 @media (max-width: 640px) {
   .ap-modal-overlay { padding: var(--sp-3) var(--sp-2); align-items: flex-end; }
   .ap-modal {
@@ -1014,7 +1042,7 @@ textarea.ap-input { resize: vertical; line-height: 1.6; }
   .ap-modal-actions .ap-btn { width: 100%; justify-content: center; }
   .ap-field-row { grid-template-columns: 1fr !important; }
 
-  /* Mobile responsive grids */
+  /* Mobile responsive grids — single column */
   .ap-roles-grid { grid-template-columns: 1fr !important; }
   .ap-admins-grid { grid-template-columns: 1fr !important; }
   .ap-biz-review-grid { grid-template-columns: 1fr !important; }
@@ -1027,7 +1055,7 @@ textarea.ap-input { resize: vertical; line-height: 1.6; }
   .ap-btn-sm { padding: 4px 8px; font-size: 0.7rem; }
 
   /* Table responsiveness */
-  .ap-table { font-size: 0.7rem; }
+  .ap-table { font-size: 0.7rem; min-width: 480px; }
   .ap-table th, .ap-table td { padding: 8px 10px; }
   .ap-td-truncate { max-width: 80px; }
 
@@ -1043,13 +1071,12 @@ textarea.ap-input { resize: vertical; line-height: 1.6; }
   /* Chart height on mobile */
   .ap-chart-canvas { height: 150px !important; }
 
-  /* Status tabs */
-  .ap-status-tabs { overflow-x: auto; padding: 0 0 8px 0; }
+  /* Status / settings tabs */
   .ap-status-tab { padding: 8px 12px; font-size: 0.8rem; }
-
-  /* Settings tabs */
-  .ap-settings-tabs { overflow-x: auto; }
   .ap-settings-tab { padding: 8px 12px; }
+
+  /* Reduce main padding */
+  .al-main { padding: 14px !important; }
 }
 
 @media (max-width: 360px) {

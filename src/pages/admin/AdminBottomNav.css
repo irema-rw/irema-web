@@ -1,0 +1,234 @@
+/* ─────────────────────────────────────────────────────────────────
+   Admin Bottom Nav — visible ≤ 1024px
+   4 primary tabs + "More" sheet for secondary pages
+───────────────────────────────────────────────────────────────── */
+
+/* Admin teal accent */
+:root {
+  --abn-accent: #1ECAB8;
+  --abn-accent-dk: #16a892;
+}
+
+.abn-bar {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+
+  /* ── Bar ── */
+  .abn-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 200;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--surface, #ffffff);
+    border-top: 1px solid var(--border, rgba(0,0,0,0.08));
+    box-shadow: 0 -2px 16px rgba(0,0,0,0.07);
+    align-items: stretch;
+    justify-content: space-around;
+    overflow: visible;
+  }
+
+  [data-theme="dark"] .abn-bar {
+    background: var(--surface, #1a1f2e);
+    border-top-color: rgba(255,255,255,0.08);
+    box-shadow: 0 -2px 16px rgba(0,0,0,0.35);
+  }
+
+  /* Body padding so content clears the bar */
+  body.admin-has-bottom-nav {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* .al-main has its own overflow-y: auto scroll context so body padding
+     doesn't reach it — push bottom padding directly onto the scroll container */
+  body.admin-has-bottom-nav .al-main {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* ── Tab items ── */
+  .abn-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+    font-size: 0.6rem;
+    font-weight: 500;
+    font-family: inherit;
+    letter-spacing: 0.01em;
+    position: relative;
+    transition: color 0.18s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .abn-item:hover { color: #6b7280; }
+
+  [data-theme="dark"] .abn-item       { color: #6b7280; }
+  [data-theme="dark"] .abn-item:hover { color: #9ca3af; }
+
+  /* Active */
+  .abn-active { color: var(--abn-accent) !important; }
+  [data-theme="dark"] .abn-active { color: var(--abn-accent) !important; }
+
+  .abn-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    transition: transform 0.18s;
+  }
+
+  .abn-active .abn-icon { transform: translateY(-1px); }
+  .abn-item:active .abn-icon { transform: scale(0.88) translateY(-1px); }
+
+  .abn-label { font-size: 0.6rem; font-weight: 500; line-height: 1; }
+  .abn-active .abn-label { font-weight: 700; }
+
+  /* Active dot */
+  .abn-dot {
+    position: absolute;
+    top: 4px;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--abn-accent);
+    opacity: 0.65;
+  }
+}
+
+/* ── More sheet overlay ── */
+.abn-overlay {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .abn-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 198;
+    animation: abnOverlayIn 0.2s ease;
+  }
+}
+
+@keyframes abnOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── More sheet ── */
+.abn-sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 199;
+  background: var(--surface, #ffffff);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--border, rgba(0,0,0,0.08));
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.14);
+  padding: 0 0 calc(72px + env(safe-area-inset-bottom, 0px));
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .abn-sheet { display: block; }
+  .abn-sheet-open { transform: translateY(0); }
+}
+
+[data-theme="dark"] .abn-sheet {
+  background: var(--surface, #1a1f2e);
+  border-top-color: rgba(255,255,255,0.08);
+}
+
+.abn-sheet-handle {
+  width: 36px; height: 4px;
+  border-radius: 2px;
+  background: var(--border, #e5e7eb);
+  margin: 12px auto 0;
+}
+
+.abn-sheet-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-4, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 12px 20px 8px;
+}
+
+/* Grid of sheet items */
+.abn-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px 12px 12px;
+}
+
+.abn-sheet-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
+  background: none;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  color: var(--text-2, #374151);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.abn-sheet-item:hover {
+  background: rgba(30,202,184,0.08);
+  color: var(--abn-accent);
+}
+
+.abn-sheet-active {
+  background: rgba(30,202,184,0.1);
+  color: var(--abn-accent) !important;
+}
+
+[data-theme="dark"] .abn-sheet-item { color: #c9d1d9; }
+[data-theme="dark"] .abn-sheet-item:hover { background: rgba(30,202,184,0.15); color: var(--abn-accent); }
+[data-theme="dark"] .abn-sheet-active { background: rgba(30,202,184,0.18); color: var(--abn-accent) !important; }
+
+.abn-sheet-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: var(--bg-2, #f3f4f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.abn-sheet-item:hover .abn-sheet-icon,
+.abn-sheet-active .abn-sheet-icon {
+  background: rgba(30,202,184,0.15);
+}
+
+[data-theme="dark"] .abn-sheet-icon { background: rgba(255,255,255,0.07); }
+
+.abn-sheet-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}

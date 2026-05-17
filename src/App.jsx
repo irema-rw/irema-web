@@ -43,6 +43,7 @@ const AdminNewsletter = lazy(() => import('./pages/admin/AdminNewsletter'));
 const AdminSupport = lazy(() => import('./pages/admin/AdminSupport'));
 const AdminEnterprise = lazy(() => import('./pages/admin/AdminEnterprise'));
 const AdminTranslations = lazy(() => import('./pages/admin/AdminTranslations'));
+const AdminTwoFactor = lazy(() => import('./pages/admin/AdminTwoFactor'));
 const QRScanPage = lazy(() => import('./pages/QRScanPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const NewsletterPage = lazy(() => import('./pages/NewsletterPage'));
@@ -165,6 +166,7 @@ export default function App() {
           <Route path="/admin/features" element={<ProtectedRoute requireAdmin><AdminFeatures /></ProtectedRoute>} />
           <Route path="/admin/enterprise" element={<ProtectedRoute requireAdmin><AdminEnterprise /></ProtectedRoute>} />
           <Route path="/admin/translations" element={<ProtectedRoute requireAdmin><AdminTranslations /></ProtectedRoute>} />
+          <Route path="/admin/two-factor" element={<ProtectedRoute requireAdmin><AdminTwoFactor /></ProtectedRoute>} />
 
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
