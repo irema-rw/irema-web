@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
-import { db } from '../../firebase/config';
+import { db, functions, httpsCallable } from '../../firebase/config';
 import { useLocation } from 'react-router-dom';
-import { collection, getDocs, deleteDoc, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthStore } from '../../store/authStore';
 import { useAdminPermissions } from '../../hooks/useAdminPermissions';
 import AdminLayout from './AdminLayout';
+import { getBusinessStatusBadge, getNextArchiveAction, isArchivedRecord } from '../../utils/adminModeration';
 import './AdminPages.css';
 
 const TIME_FILTERS = [
@@ -36,7 +37,9 @@ export default function AdminBusinesses() {
   const [loading, setLoading] = useState(true);
   const [editBiz, setEditBiz] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [archiveBiz, setArchiveBiz] = useState(null);
   const [deleteBizItem, setDeleteBizItem] = useState(null);
+  const [verifyBiz, setVerifyBiz] = useState(null);
   const [viewBiz, setViewBiz] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -100,59 +103,76 @@ export default function AdminBusinesses() {
   useEffect(() => {
     let r=[...businesses];
     if(search){const q=search.toLowerCase();r=r.filter(b=>(b.companyName||b.name||'').toLowerCase().includes(q)||(b.category||'').toLowerCase().includes(q));}
-    if(statusFilter){if(statusFilter==='verified')r=r.filter(b=>b.isVerified);else if(statusFilter==='archived')r=r.filter(b=>b.status==='archived');else if(statusFilter==='unverified')r=r.filter(b=>!b.isVerified&&b.status!=='archived');else r=r.filter(b=>b.status===statusFilter);}
+    if(statusFilter){if(statusFilter==='verified')r=r.filter(b=>b.isVerified&&!isArchivedRecord(b));else if(statusFilter==='archived')r=r.filter(b=>isArchivedRecord(b));else if(statusFilter==='unverified')r=r.filter(b=>!b.isVerified&&!isArchivedRecord(b));else r=r.filter(b=>b.status===statusFilter);}
     if(catFilter) r=r.filter(b=>(b.category||'other')===catFilter);
     if(timeFilter.ms){const cut=Date.now()-timeFilter.ms;r=r.filter(b=>{const t=b.createdAt?.seconds?b.createdAt.seconds*1000:0;return !b.createdAt||t>=cut;});}
     setFiltered(r); setPage(1);
   }, [search, statusFilter, catFilter, timeFilter, businesses]);
 
-  const toggleVerify = async (id, current) => {
-    await updateDoc(doc(db,'companies',id),{isVerified:!current});
-    await addDoc(collection(db,'audit_logs'),{action:'biz_verified',detail:`${!current?'Verified':'Unverified'} business ${id}`,adminEmail:adminUser?.email,timestamp:serverTimestamp()});
-    setBusinesses(prev=>prev.map(b=>b.id===id?{...b,isVerified:!current}:b));
-    showToast(`Business ${!current?'verified':'unverified'}`);
+  const confirmVerify = async () => {
+    if (!verifyBiz) return;
+    const nextVerified = !verifyBiz.isVerified;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db,'companies',verifyBiz.id),{isVerified:nextVerified});
+      await addDoc(collection(db,'audit_logs'),{action:'biz_verified',detail:`${nextVerified?'Verified':'Removed verification for'} business ${verifyBiz.companyName||verifyBiz.name||verifyBiz.id}`,adminEmail:adminUser?.email,timestamp:serverTimestamp()});
+      setBusinesses(prev=>prev.map(b=>b.id===verifyBiz.id?{...b,isVerified:nextVerified}:b));
+      setVerifyBiz(null);
+      showToast(`Business ${nextVerified?'verified':'verification removed'}`);
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+    setSaving(false);
   };
 
   const confirmDelete = async () => {
     if(!deleteBizItem) return;
     setSaving(true);
     try {
-      // Soft-delete: archive instead of permanently removing
-      // This preserves reviews and allows restoration
-      await updateDoc(doc(db,'companies',deleteBizItem.id), {
-        status: 'archived',
-        archivedAt: serverTimestamp(),
-        archivedBy: adminUser?.email,
-        previousStatus: deleteBizItem.status || 'active',
-      });
-      await addDoc(collection(db,'audit_logs'),{
-        action:'biz_archived',
-        detail:`Archived business: ${deleteBizItem.companyName||deleteBizItem.name} (ID: ${deleteBizItem.id}). Reviews preserved. Can be restored.`,
-        adminEmail:adminUser?.email,
-        timestamp:serverTimestamp()
-      });
+      const deleteBusinessData = httpsCallable(functions, 'deleteBusinessData');
+      await deleteBusinessData({ companyId: deleteBizItem.id });
       setBusinesses(prev=>prev.filter(b=>b.id!==deleteBizItem.id));
       setDeleteBizItem(null);
-      showToast('Business archived (reviews preserved — can be restored)');
+      showToast('Business and related data permanently deleted');
     } catch(e){showToast(e.message,'error');}
     setSaving(false);
   };
 
-  const restoreBusiness = async (biz) => {
+  const confirmArchive = async () => {
+    if (!archiveBiz) return;
+    const action = getNextArchiveAction(archiveBiz, 'business');
+    setSaving(true);
     try {
-      await updateDoc(doc(db,'companies',biz.id), {
-        status: biz.previousStatus || 'active',
-        archivedAt: null, archivedBy: null,
-      });
+      const update = action.nextStatus === 'archived'
+        ? {
+            status: 'archived',
+            archivedAt: serverTimestamp(),
+            archivedBy: adminUser?.email || null,
+            previousStatus: archiveBiz.status || 'active',
+          }
+        : {
+            status: archiveBiz.previousStatus && archiveBiz.previousStatus !== 'archived'
+              ? archiveBiz.previousStatus
+              : 'active',
+            archivedAt: null,
+            archivedBy: null,
+            previousStatus: null,
+          };
+      await updateDoc(doc(db,'companies',archiveBiz.id), update);
       await addDoc(collection(db,'audit_logs'),{
-        action:'biz_restored',
-        detail:`Restored business: ${biz.companyName||biz.name}`,
+        action: action.auditAction,
+        detail:`${action.label}: ${archiveBiz.companyName||archiveBiz.name}`,
         adminEmail:adminUser?.email,
         timestamp:serverTimestamp()
       });
-      setBusinesses(prev=>prev.map(b=>b.id===biz.id?{...b,status:biz.previousStatus||'active',archivedAt:null}:b));
-      showToast('Business restored successfully');
+      setBusinesses(prev=>prev.map(b=>b.id===archiveBiz.id?{...b,...update}:b));
+      window.dispatchEvent(new CustomEvent('irema:businessArchiveChanged', {
+        detail: { companyId: archiveBiz.id, status: update.status }
+      }));
+      setArchiveBiz(null);
+      showToast(`Business ${action.nextStatus === 'archived' ? 'archived' : 'unarchived'} successfully`);
     } catch(e){showToast(e.message,'error');}
+    setSaving(false);
   };
 
   const saveEdit = async () => {
@@ -218,6 +238,7 @@ export default function AdminBusinesses() {
             <option value="">All Status</option>
             <option value="verified">{t('admin.verified')||'Verified'}</option>
             <option value="unverified">{t('admin.unverified')||'Unverified'}</option>
+            <option value="archived">Archived</option>
           </select>
           <select className="ap-filter-select" value={catFilter} onChange={e=>setCatFilter(e.target.value)}>
             <option value="">All Categories</option>
@@ -237,8 +258,9 @@ export default function AdminBusinesses() {
             : paginated.length===0 ? <tr><td colSpan="7" className="ap-empty">No businesses match your filters</td></tr>
             : paginated.map(biz=>{
               const name=biz.companyName||biz.name||'Business';
+              const statusBadge = getBusinessStatusBadge(biz);
               return (
-                <tr key={biz.id} className="ap-tr-hover">
+                <tr key={biz.id} className={`ap-tr-hover${isArchivedRecord(biz) ? ' ap-row-inactive' : ''}`}>
                   <td>
                     <div className="ap-user-cell">
                       <div className="ap-avatar" style={{background:'linear-gradient(135deg,var(--info),#0ea5e9)'}}>{name[0].toUpperCase()}</div>
@@ -255,7 +277,7 @@ export default function AdminBusinesses() {
                   <td><span className="ap-badge gray">{biz.category||'—'}</span></td>
                   <td style={{fontWeight:700,color:biz.averageRating>=4?'var(--success)':'var(--text-2)'}}>{biz.averageRating?biz.averageRating.toFixed(1):'—'}</td>
                   <td className="ap-td-date">{biz.totalReviews||0}</td>
-                  <td><span className={`ap-badge ${biz.isVerified?'green':'yellow'}`}>{biz.isVerified?'Verified':'Unverified'}</span></td>
+                  <td><span className={`ap-badge ${statusBadge.className}`}>{statusBadge.label}</span></td>
                   <td>
                     <div className="ap-row-actions" style={{justifyContent:'flex-end'}}>
                       <button className="ap-icon-action-btn" title="View" onClick={()=>setViewBiz(biz)}>
@@ -267,14 +289,24 @@ export default function AdminBusinesses() {
                       <button className="ap-icon-action-btn" title="Edit" onClick={()=>{setEditBiz(biz);setEditForm({companyName:biz.companyName||biz.name||'',category:biz.category||'',description:biz.description||'',phone:biz.phone||'',website:biz.website||'',address:biz.address||''});}}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
-                      <button className={`ap-icon-action-btn ${biz.isVerified?'warning':'success'}`} title={biz.isVerified?'Unverify':'Verify'} onClick={()=>toggleVerify(biz.id,biz.isVerified)}>
-                        {biz.isVerified
-                          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                          : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                      {can('verify_businesses') && (
+                        <button className={`ap-icon-action-btn ${biz.isVerified?'warning':'success'}`} title={biz.isVerified?'Remove verification':'Verify'} onClick={()=>setVerifyBiz(biz)}>
+                          {biz.isVerified
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                          }
+                        </button>
+                      )}
+                      {can('delete_businesses') && (
+                      <button className={`ap-icon-action-btn ${isArchivedRecord(biz) ? 'success' : 'warning'}`} title={isArchivedRecord(biz) ? 'Unarchive' : 'Archive'} onClick={()=>setArchiveBiz(biz)}>
+                        {isArchivedRecord(biz)
+                          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h18"/><path d="M5 7v13h14V7"/><path d="M9 11l3 3 3-3"/></svg>
+                          : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v12h14V8"/><path d="M10 12h4"/></svg>
                         }
                       </button>
+                      )}
                       {can('delete_businesses') && (
-                      <button className="ap-icon-action-btn danger" title="Delete" onClick={()=>setDeleteBizItem(biz)}>
+                      <button className="ap-icon-action-btn danger" title="Permanently delete" onClick={()=>setDeleteBizItem(biz)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                       </button>
                       )}
@@ -303,7 +335,7 @@ export default function AdminBusinesses() {
                 <div className="ap-view-email">{viewBiz.email||'No email'}</div>
                 <div style={{display:'flex',gap:4,marginTop:6,flexWrap:'wrap'}}>
                   <span className="ap-badge gray">{viewBiz.category||'other'}</span>
-                  <span className={`ap-badge ${viewBiz.isVerified?'green':'yellow'}`}>{viewBiz.isVerified?'Verified':'Unverified'}</span>
+                  <span className={`ap-badge ${getBusinessStatusBadge(viewBiz).className}`}>{getBusinessStatusBadge(viewBiz).label}</span>
                 </div>
               </div>
             </div>
@@ -345,18 +377,72 @@ export default function AdminBusinesses() {
         </div>
       )}
 
+      {/* Archive Modal */}
+      {archiveBiz && (
+        <div className="ap-modal-overlay" onClick={e=>e.target===e.currentTarget&&setArchiveBiz(null)}>
+          <div className="ap-modal ap-modal-sm">
+            <div className="ap-modal-header"><h3>{getNextArchiveAction(archiveBiz, 'business').label}</h3><button className="ap-modal-close" onClick={()=>setArchiveBiz(null)}>✕</button></div>
+            <div className="ap-danger-box">
+              <div className="ap-danger-icon">⚠️</div>
+              <div>
+                <strong>{isArchivedRecord(archiveBiz) ? 'Restore this business?' : 'Archive this business?'}</strong>
+                <p>
+                  {isArchivedRecord(archiveBiz)
+                    ? <>Unarchiving <strong>{archiveBiz.companyName||archiveBiz.name}</strong> makes it visible on the platform again.</>
+                    : <>Archiving <strong>{archiveBiz.companyName||archiveBiz.name}</strong> hides it from the public platform while preserving reviews, subscriptions, and business data for restoration.</>
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="ap-modal-actions">
+              <button className="ap-btn ap-btn-secondary" onClick={()=>setArchiveBiz(null)}>{t('admin.cancel')||'Cancel'}</button>
+              <button className={isArchivedRecord(archiveBiz) ? 'ap-btn ap-btn-success' : 'ap-btn ap-btn-danger'} onClick={confirmArchive} disabled={saving}>
+                {saving ? getNextArchiveAction(archiveBiz, 'business').progressLabel : getNextArchiveAction(archiveBiz, 'business').label}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Verification Modal */}
+      {verifyBiz && (
+        <div className="ap-modal-overlay" onClick={e=>e.target===e.currentTarget&&setVerifyBiz(null)}>
+          <div className="ap-modal ap-modal-sm">
+            <div className="ap-modal-header"><h3>{verifyBiz.isVerified ? 'Remove Verification' : 'Verify Business'}</h3><button className="ap-modal-close" onClick={()=>setVerifyBiz(null)}>✕</button></div>
+            <div className="ap-danger-box">
+              <div className="ap-danger-icon">⚠️</div>
+              <div>
+                <strong>{verifyBiz.isVerified ? 'Remove verified status?' : 'Confirm business verification?'}</strong>
+                <p>
+                  {verifyBiz.isVerified
+                    ? <>This will remove the verified badge from <strong>{verifyBiz.companyName||verifyBiz.name}</strong> across the platform.</>
+                    : <>This will mark <strong>{verifyBiz.companyName||verifyBiz.name}</strong> as verified and show the verified badge publicly.</>
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="ap-modal-actions">
+              <button className="ap-btn ap-btn-secondary" onClick={()=>setVerifyBiz(null)}>{t('admin.cancel')||'Cancel'}</button>
+              <button className={verifyBiz.isVerified ? 'ap-btn ap-btn-danger' : 'ap-btn ap-btn-success'} onClick={confirmVerify} disabled={saving}>
+                {saving ? 'Saving...' : verifyBiz.isVerified ? 'Remove Verification' : 'Verify Business'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Modal */}
       {deleteBizItem && (
         <div className="ap-modal-overlay" onClick={e=>e.target===e.currentTarget&&setDeleteBizItem(null)}>
           <div className="ap-modal ap-modal-sm">
-            <div className="ap-modal-header"><h3>Archive Business</h3><button className="ap-modal-close" onClick={()=>setDeleteBizItem(null)}>✕</button></div>
+            <div className="ap-modal-header"><h3>Permanently Delete Business</h3><button className="ap-modal-close" onClick={()=>setDeleteBizItem(null)}>✕</button></div>
             <div className="ap-danger-box">
               <div className="ap-danger-icon">⚠️</div>
-              <div><strong>Archive this business?</strong><p>Archiving <strong>{deleteBizItem.companyName||deleteBizItem.name}</strong> hides it from public but preserves all reviews and data. It can be restored anytime from the Archived filter.</p></div>
+              <div><strong>This action cannot be undone</strong><p>Deleting <strong>{deleteBizItem.companyName||deleteBizItem.name}</strong> permanently removes the business, reviews, products, stories, claims, notifications, subscriptions, payments, and analytics snapshots. Use Archive when you only want to hide it.</p></div>
             </div>
             <div className="ap-modal-actions">
               <button className="ap-btn ap-btn-secondary" onClick={()=>setDeleteBizItem(null)}>{t('admin.cancel')||'Cancel'}</button>
-              <button className="ap-btn ap-btn-danger" onClick={confirmDelete} disabled={saving}>{saving?'Archiving…':'Archive Business'}</button>
+              <button className="ap-btn ap-btn-danger" onClick={confirmDelete} disabled={saving}>{saving?'Deleting...':'Delete Permanently'}</button>
             </div>
           </div>
         </div>

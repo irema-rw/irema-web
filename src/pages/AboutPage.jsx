@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useThemeStore } from '../store/themeStore';
 import { db, collection, getDocs } from '../firebase/config';
+import { isArchivedRecord } from '../utils/adminModeration';
 
 export default function AboutPage() {
   const { theme } = useThemeStore();
@@ -13,7 +14,7 @@ export default function AboutPage() {
     async function loadBusinessCount() {
       try {
         const snap = await getDocs(collection(db, 'companies'));
-        const count = snap.docs.length;
+        const count = snap.docs.filter(d => !isArchivedRecord(d.data())).length;
         // Format as "X,XXX+" for display
         const formatted = count >= 1000
           ? (count / 1000).toFixed(0) + 'K+'

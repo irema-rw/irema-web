@@ -14,6 +14,9 @@ import MiddleMetricsPanel from '../components/MiddleMetricsPanel';
 import PremiumMetricsPanel from '../components/PremiumMetricsPanel';
 // AnalyticsTrialCountdown, AnalyticsUpgradePrompt, TierComparison removed — analytics tier is plan-derived
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
+import { canStartPlanTrial } from '../utils/subscriptionAccess';
+import { validateReplyText } from '../utils/reviewLimits';
+import { isArchivedRecord } from '../utils/adminModeration';
 import { canStartProfessionalTrial } from '../utils/subscriptionAccess';
 import PaymentModal from '../components/PaymentModal';
 import BizBottomNav from '../components/BizBottomNav';
@@ -379,23 +382,26 @@ export default function CompanyDashboard() {
 
   // Centralized subscription status (replaces scattered inline checks)
   const subStatus = useSubscriptionStatus(company?.id, company);
-  const canStartTrial = !subStatus.loading && canStartProfessionalTrial(subStatus.subscription);
+  const canStartTrial = !subStatus.loading && canStartPlanTrial(subStatus.subscription);
   const canReplyToReviews = subStatus.hasAccess('reply_reviews');
   const canViewAnalytics = subStatus.hasAccess('analytics_advanced');
 
   const showToast = (msg, type='success') => { setToast({msg,type}); };
 
-  async function startProfessionalTrial() {
+  async function startPlanTrial(planId = 'professional') {
     if (!company?.id) return;
-    if (!canStartProfessionalTrial(subStatus.subscription)) {
+    if (!['professional', 'enterprise'].includes(planId)) return;
+    if (!canStartPlanTrial(subStatus.subscription)) {
       showToast('This business has already used its free trial.', 'error');
       return;
     }
 
+    const selectedPlan = PLANS.find(plan => plan.id === planId);
+    const planName = selectedPlan?.name || 'Professional';
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + 14);
     const trialCoreData = {
-      plan: 'professional',
+      plan: planId,
       status: 'trial',
       trialEndsAt: trialEnd,
       trialStartedAt: serverTimestamp(),
@@ -408,7 +414,7 @@ export default function CompanyDashboard() {
       companyId: company.id,
       businessName: company.companyName || company.name || 'Business',
       adminEmail: company.adminEmail || company.email || company.workEmail || currentUser?.email || '',
-      amount: 25000,
+      amount: selectedPlan?.price || 25000,
       billingCycle: 'monthly',
     };
 
@@ -434,12 +440,12 @@ export default function CompanyDashboard() {
       setTrialDaysLeft(14);
       await addDoc(collection(db,'notifications'), {
         type:'trial_started', userId:'admin',
-        message:`${company.companyName||company.name} started a 14-day Professional trial.`,
+        message:`${company.companyName||company.name} started a 14-day ${planName} trial.`,
         companyId: company.id, createdAt: serverTimestamp(), read: false,
       }).catch(()=>{});
-      showToast('✓ 14-day Professional trial started! Enjoy full features.', 'success');
+      showToast(`✓ 14-day ${planName} trial started! Enjoy full features.`, 'success');
     } catch (e) {
-      console.error('Failed to start Professional trial:', e);
+      console.error(`Failed to start ${planName} trial:`, e);
       showToast(e.message || 'Failed to start trial', 'error');
     } finally {
       setTrialStarting(false);
@@ -519,7 +525,7 @@ export default function CompanyDashboard() {
         if (co.category) {
           getDocs(query(collection(db,'companies'), where('category','==',co.category), limit(10)))
             .then(cSnap => {
-              const comps = cSnap.docs.map(c=>({id:c.id,...c.data()})).filter(c=>c.id!==d.id);
+              const comps = cSnap.docs.map(c=>({id:c.id,...c.data()})).filter(c=>c.id!==d.id && !isArchivedRecord(c));
               comps.sort((a,b)=>(b.averageRating||0)-(a.averageRating||0));
               setCompetitors(comps.slice(0,6));
             })

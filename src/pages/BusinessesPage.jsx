@@ -12,6 +12,7 @@ import { ensureUniqueSlug } from '../utils/slug';
 import { getEmailVerificationActionCodeSettings } from '../utils/emailVerification';
 import { getAuthErrorMessage } from '../utils/authErrors';
 import { resolveAuthFlow } from '../components/AuthRedirectHandler';
+import { isArchivedRecord } from '../utils/adminModeration';
 import './BusinessesPage.css';
 
 const CATS = [
@@ -105,7 +106,7 @@ export default function BusinessesPage() {
         setHeroAvg(parseFloat((ratings.reduce((s,r) => s+r, 0) / total).toFixed(1)));
       }
       // Get business count
-      setBusinessCount(bizSnap.docs.length);
+      setBusinessCount(bizSnap.docs.filter(d => !isArchivedRecord(d.data())).length);
     }).catch(err => {
       if (import.meta.env.DEV) console.warn('[BusinessesPage] stats load failed:', err);
     });
@@ -383,6 +384,7 @@ export default function BusinessesPage() {
       const q = claimSearch.toLowerCase().trim();
       snap.docs.forEach(d => {
         const data = d.data();
+        if (isArchivedRecord(data)) return;
         const n = (data.companyName||data.name||'').toLowerCase();
         const cat = (data.category||'').toLowerCase();
         if (n.includes(q) || cat.includes(q)) results.push({id:d.id,...data});
@@ -742,7 +744,7 @@ export default function BusinessesPage() {
                   </>
                 )}
                 <button className={plan.primary?'bp-btn-primary':'bp-btn-outline'}
-                  onClick={()=>plan.isEnt ? window.open('mailto:business@irema.rw','_blank') : setModal('register')}>
+                  onClick={()=>setModal('register')}>
                   {t(`biz.${plan.ctaKey}`)}
                 </button>
               </div>

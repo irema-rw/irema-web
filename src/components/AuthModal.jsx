@@ -27,6 +27,7 @@ import {
 import { getAuthErrorMessage } from '../utils/authErrors';
 import { resolveAuthFlow } from './AuthRedirectHandler';
 import { useNavigate } from 'react-router-dom';
+import { isArchivedRecord } from '../utils/adminModeration';
 
 // ── Review upload constants ──────────────────────────────────────────────────
 const MAX_REVIEW_PHOTOS  = 4;           // max photos per review
@@ -409,6 +410,7 @@ export default function AuthModal() {
       const results = [];
       snap.forEach(d => {
         const data = d.data();
+        if (isArchivedRecord(data)) return;
         const name = (data.companyName || data.name || '').toLowerCase();
         const cat = (data.category||'').toLowerCase();
         if (name.includes(lower) || cat.includes(lower)) results.push({ id: d.id, ...data });
