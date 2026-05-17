@@ -649,7 +649,7 @@ export default function BusinessesPage() {
             {[
               {nameKey:'plan_starter', price:'Free', subKey:'plan_starter_sub', features:['1 listing','Basic analytics','Email support','Community badge'], ctaKey:'start_free_plan', primary:false, isEnt:false},
               {nameKey:'plan_pro', price:'25,000 RWF', subKey:'plan_pro_sub', features:['Unlimited reviews','Advanced analytics','Reply management','Competitor insights','Verified badge','QR codes'], ctaKey:'start_trial', primary:true, isEnt:false},
-              {nameKey:'plan_ent', price:'75,000 RWF', subKey:'plan_ent_sub', features:['Up to 5 listings','AI sentiment','Dedicated manager','API access','White-label widgets'], ctaKey:'contact_sales', primary:false, isEnt:true},
+              {nameKey:'plan_ent', price:'75,000 RWF', subKey:'plan_ent_sub', features:['Up to 5 listings','AI sentiment','Dedicated manager','API access','White-label widgets'], ctaKey:'get_trial_14', primary:false, isEnt:true},
             ].map(plan=>(
               <div key={plan.nameKey} className={`bp-price-card${plan.primary?' bp-price-highlight':''}`}>
                 {plan.primary && <div className="bp-price-pop">{t('biz.most_popular')}</div>}
@@ -660,7 +660,7 @@ export default function BusinessesPage() {
                   {plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}
                 </ul>
                 <button className={plan.primary?'bp-btn-primary':'bp-btn-outline'}
-                  onClick={()=>plan.isEnt ? window.open('mailto:business@irema.rw','_blank') : setModal('register')}>
+                  onClick={()=>setModal('register')}>
                   {t(`biz.${plan.ctaKey}`)}
                 </button>
               </div>

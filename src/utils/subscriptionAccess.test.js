@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getSubscriptionAccess, canStartProfessionalTrial, selectBestSubscription } from './subscriptionAccess.js';
+import { getSubscriptionAccess, canStartPlanTrial, selectBestSubscription } from './subscriptionAccess.js';
 
 const now = new Date('2026-05-02T10:00:00Z');
 
@@ -65,7 +65,7 @@ test('pending subscriptions do not grant paid access', () => {
 });
 
 test('starter analytics trial accounts can start professional trial', () => {
-  assert.equal(canStartProfessionalTrial({
+  assert.equal(canStartPlanTrial({
     plan: 'starter',
     status: 'trial',
     analyticsTrialEndsAt: new Date('2026-05-10T10:00:00Z'),
@@ -94,20 +94,39 @@ test('active professional subscriptions unlock analytics page and replies', () =
   assert.equal(access.hasAccess('reply_reviews'), true);
 });
 
-test('accounts that already had professional trial cannot start another one', () => {
-  assert.equal(canStartProfessionalTrial({
+test('accounts that already had a plan trial cannot start another one', () => {
+  assert.equal(canStartPlanTrial({
     plan: 'professional',
     status: 'expired',
     trialEndsAt: new Date('2026-05-01T10:00:00Z'),
   }), false);
+  assert.equal(canStartPlanTrial({
+    plan: 'enterprise',
+    status: 'trial',
+    trialEndsAt: new Date('2026-05-10T10:00:00Z'),
+  }), false);
 });
 
-test('active paid accounts do not see professional trial banner', () => {
-  assert.equal(canStartProfessionalTrial({
+test('active paid accounts do not see plan trial banner', () => {
+  assert.equal(canStartPlanTrial({
     plan: 'professional',
     status: 'active',
     nextBillingDate: new Date('2026-06-02T10:00:00Z'),
   }), false);
+});
+
+test('enterprise trials unlock enterprise-ranked features during the trial', () => {
+  const access = getSubscriptionAccess({
+    plan: 'enterprise',
+    status: 'trial',
+    locked: false,
+    trialEndsAt: new Date('2026-05-10T10:00:00Z'),
+  }, now);
+
+  assert.equal(access.isTrial, true);
+  assert.equal(access.effectivePlan, 'enterprise');
+  assert.equal(access.hasAccess('api_access'), true);
+  assert.equal(access.hasAccess('product_listings'), true);
 });
 
 test('selects linked admin-enabled subscription over older expired starter doc', () => {

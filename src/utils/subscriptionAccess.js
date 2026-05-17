@@ -13,14 +13,16 @@ function isPast(value, now) {
   return date ? date < now : false;
 }
 
-export function canStartProfessionalTrial(subscription) {
+export function canStartPlanTrial(subscription) {
   if (!subscription) return true;
   if (subscription.trialEndsAt || subscription.trialStarted || subscription.trialStartedAt) return false;
   if (subscription.status === 'active' && ['professional', 'enterprise'].includes(subscription.plan)) return false;
   if (subscription.status === 'pending' && ['professional', 'enterprise'].includes(subscription.plan)) return false;
-  if (subscription.status === 'trial' && subscription.plan === 'professional') return false;
+  if (subscription.status === 'trial' && ['professional', 'enterprise'].includes(subscription.plan)) return false;
   return true;
 }
+
+export const canStartProfessionalTrial = canStartPlanTrial;
 
 export function selectBestSubscription(subscriptions = [], now = new Date(), company = {}) {
   if (!subscriptions.length) return null;

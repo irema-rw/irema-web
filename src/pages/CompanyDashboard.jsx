@@ -16,7 +16,7 @@ import AnalyticsTrialCountdown from '../components/AnalyticsTrialCountdown';
 import AnalyticsUpgradePrompt from '../components/AnalyticsUpgradePrompt';
 import TierComparison from '../components/TierComparison';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
-import { canStartProfessionalTrial } from '../utils/subscriptionAccess';
+import { canStartPlanTrial } from '../utils/subscriptionAccess';
 import { validateReplyText } from '../utils/reviewLimits';
 import { isArchivedRecord } from '../utils/adminModeration';
 
@@ -100,10 +100,10 @@ const PLANS = [
     cta:'Get Started Free', highlight:false },
   { id:'professional', name:'Professional', price:25000, currency:'RWF', period:'month',
     features:['1 business listing','Unlimited reviews','Unlimited responses to reviews','Advanced analytics + charts','Priority support','Verified badge','QR code downloads','Competitor insights'],
-    cta:'Get Professional', highlight:true },
+    cta:'Start 14-day Trial', highlight:true },
   { id:'enterprise', name:'Enterprise', price:75000, currency:'RWF', period:'month',
     features:['Up to 5 listings','Unlimited everything','Unlimited responses','AI sentiment analysis','Dedicated account manager','Custom integrations','White-label widgets','API access','SLA support','Product listings on your page'],
-    cta:'Get Enterprise', highlight:false },
+    cta:'Get 14 days trial', highlight:false },
 ];
 
 /* ── QR Code Section ── */
@@ -323,23 +323,26 @@ export default function CompanyDashboard() {
 
   // Centralized subscription status (replaces scattered inline checks)
   const subStatus = useSubscriptionStatus(company?.id, company);
-  const canStartTrial = !subStatus.loading && canStartProfessionalTrial(subStatus.subscription);
+  const canStartTrial = !subStatus.loading && canStartPlanTrial(subStatus.subscription);
   const canReplyToReviews = subStatus.hasAccess('reply_reviews');
   const canViewAnalytics = subStatus.hasAccess('analytics_advanced');
 
   const showToast = (msg, type='success') => { setToast({msg,type}); };
 
-  async function startProfessionalTrial() {
+  async function startPlanTrial(planId = 'professional') {
     if (!company?.id) return;
-    if (!canStartProfessionalTrial(subStatus.subscription)) {
+    if (!['professional', 'enterprise'].includes(planId)) return;
+    if (!canStartPlanTrial(subStatus.subscription)) {
       showToast('This business has already used its free trial.', 'error');
       return;
     }
 
+    const selectedPlan = PLANS.find(plan => plan.id === planId);
+    const planName = selectedPlan?.name || 'Professional';
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + 14);
     const trialCoreData = {
-      plan: 'professional',
+      plan: planId,
       status: 'trial',
       trialEndsAt: trialEnd,
       trialStartedAt: serverTimestamp(),
@@ -352,7 +355,7 @@ export default function CompanyDashboard() {
       companyId: company.id,
       businessName: company.companyName || company.name || 'Business',
       adminEmail: company.adminEmail || company.email || company.workEmail || currentUser?.email || '',
-      amount: 25000,
+      amount: selectedPlan?.price || 25000,
       billingCycle: 'monthly',
     };
 
@@ -378,12 +381,12 @@ export default function CompanyDashboard() {
       setTrialDaysLeft(14);
       await addDoc(collection(db,'notifications'), {
         type:'trial_started', userId:'admin',
-        message:`${company.companyName||company.name} started a 14-day Professional trial.`,
+        message:`${company.companyName||company.name} started a 14-day ${planName} trial.`,
         companyId: company.id, createdAt: serverTimestamp(), read: false,
       }).catch(()=>{});
-      showToast('✓ 14-day Professional trial started! Enjoy full features.', 'success');
+      showToast(`✓ 14-day ${planName} trial started! Enjoy full features.`, 'success');
     } catch (e) {
-      console.error('Failed to start Professional trial:', e);
+      console.error(`Failed to start ${planName} trial:`, e);
       showToast(e.message || 'Failed to start trial', 'error');
     } finally {
       setTrialStarting(false);
@@ -1625,7 +1628,7 @@ export default function CompanyDashboard() {
                     <div style={{fontWeight:800,color:'var(--biz-text-1)',marginBottom:4}}>Start your 14-day Professional trial</div>
                     <div style={{fontSize:'0.88rem',color:'var(--biz-text-2)'}}>Unlock replies, advanced analytics, QR code downloads, competitor insights, and more.</div>
                   </div>
-                  <button className="biz-btn biz-btn-primary" onClick={startProfessionalTrial} disabled={trialStarting}>
+                  <button className="biz-btn biz-btn-primary" onClick={() => startPlanTrial('professional')} disabled={trialStarting}>
                     {trialStarting ? 'Starting...' : 'Start Free Trial'}
                   </button>
                 </div>
@@ -1648,7 +1651,7 @@ export default function CompanyDashboard() {
                       const PLAN_RANK = { starter: 0, professional: 1, enterprise: 2 };
                       const effectivePlan = subStatus.effectivePlan;
                       const isCurrentPlan = effectivePlan === plan.id;
-                      const isTrialActive = subStatus.isTrial && plan.id === 'professional';
+                      const isTrialActive = subStatus.isTrial && plan.id === effectivePlan;
                       const isDowngrade = effectivePlan && PLAN_RANK[plan.id] < PLAN_RANK[effectivePlan];
 
                       // No CTA for downgrades or non-current starter
@@ -1662,13 +1665,11 @@ export default function CompanyDashboard() {
                           className={`biz-btn biz-plan-btn${plan.highlight?' biz-btn-primary':' biz-btn-outline'}`}
                           disabled={isCurrentPlan || isTrialActive}
                           onClick={async ()=>{
-                            if (plan.id === 'professional') {
-                              await startProfessionalTrial();
-                            } else if (plan.id === 'enterprise') {
-                              setEnterpriseModal(true);
+                            if (plan.id === 'professional' || plan.id === 'enterprise') {
+                              await startPlanTrial(plan.id);
                             }
                           }}>
-                          {isCurrentPlan ? '✓ Current Plan' : isTrialActive ? `Trial Active — ${subStatus.trialDaysLeft ?? '?'} days left` : plan.cta}
+                          {isTrialActive ? `Trial Active — ${subStatus.trialDaysLeft ?? '?'} days left` : isCurrentPlan ? '✓ Current Plan' : plan.cta}
                         </button>
                       );
                     })()}
