@@ -1,6 +1,6 @@
 // src/hooks/useAuth.js
 import { useEffect } from 'react';
-import { auth, db, doc, getDoc, onAuthStateChanged } from '../firebase/config';
+import { auth, db, doc, getDoc, onAuthStateChanged, signOut } from '../firebase/config';
 import { useAuthStore } from '../store/authStore';
 import { clearPermissionsCache } from './useAdminPermissions';
 
@@ -13,7 +13,15 @@ export function useAuthInit() {
         setUser(firebaseUser);
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          setUserProfile(userDoc.exists() ? userDoc.data() : null);
+          const profile = userDoc.exists() ? userDoc.data() : null;
+          if (profile?.status === 'archived') {
+            await signOut(auth);
+            setUser(null);
+            setUserProfile(null);
+            setLoading(false);
+            return;
+          }
+          setUserProfile(profile);
         } catch {
           setUserProfile(null);
         }

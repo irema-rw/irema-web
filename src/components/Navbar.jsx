@@ -10,6 +10,7 @@ import { useThemeStore } from '../store/themeStore';
 import { clearPermissionsCache } from '../hooks/useAdminPermissions';
 import { LANGUAGES } from '../constants/languages';
 import ChangePasswordModal from './ChangePasswordModal';
+import { isArchivedRecord } from '../utils/adminModeration';
 import './Navbar.css';
 
 // ── Logo options A/B/C/D — swap the function body to change logo ──
@@ -42,6 +43,16 @@ export default function Navbar() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionsCache = React.useRef(null);
 
+  useEffect(() => {
+    function handleBusinessArchiveChanged() {
+      suggestionsCache.current = null;
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+    window.addEventListener('irema:businessArchiveChanged', handleBusinessArchiveChanged);
+    return () => window.removeEventListener('irema:businessArchiveChanged', handleBusinessArchiveChanged);
+  }, []);
+
   // Sync navbar search box with URL ?q= param
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -59,8 +70,8 @@ export default function Navbar() {
           const snap = await getDocs(collection(db, 'companies'));
           suggestionsCache.current = snap.docs.map(d => {
             const data = d.data();
-            return { id: d.id, slug: data.slug || null, name: data.companyName || data.name || '', category: data.category || '' };
-          });
+            return { id: d.id, slug: data.slug || null, name: data.companyName || data.name || '', category: data.category || '', status: data.status || '' };
+          }).filter(c => !isArchivedRecord(c));
         }
         const q = searchQ.toLowerCase().trim();
         const matches = suggestionsCache.current

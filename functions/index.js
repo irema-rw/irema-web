@@ -97,3 +97,8 @@ exports.callClaudeAPI = claudeAPI.callClaudeAPI;
 // Import and export newsletter sending function
 const newsletter = require('./sendNewsletter');
 exports.sendNewsletter = newsletter.sendNewsletter;
+
+// Import and export admin moderation functions
+const adminModeration = require('./adminModeration');
+exports.deleteUserData = adminModeration.deleteUserData;
+exports.deleteBusinessData = adminModeration.deleteBusinessData;

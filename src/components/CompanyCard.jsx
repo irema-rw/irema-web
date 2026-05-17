@@ -4,10 +4,13 @@ import { useTranslation } from 'react-i18next';
 import StarRating from './StarRating';
 import { getCategoryLabel, getRatingColor, getRatingLabel } from '../utils/helpers';
 import { companyPath } from '../utils/slug';
+import { isArchivedRecord } from '../utils/adminModeration';
 import './CompanyCard.css';
 
 export default function CompanyCard({ company }) {
   const { t, i18n } = useTranslation();
+  if (isArchivedRecord(company)) return null;
+
   const name = company.companyName || company.name || 'Unknown';
   const rating = company.averageRating || 0;
   const reviews = company.totalReviews || 0;

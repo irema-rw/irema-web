@@ -18,6 +18,7 @@ import TierComparison from '../components/TierComparison';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
 import { canStartProfessionalTrial } from '../utils/subscriptionAccess';
 import { validateReplyText } from '../utils/reviewLimits';
+import { isArchivedRecord } from '../utils/adminModeration';
 
 /* ── Brand Logo ── */
 function BizLogo() {
@@ -462,7 +463,7 @@ export default function CompanyDashboard() {
         if (co.category) {
           getDocs(query(collection(db,'companies'), where('category','==',co.category), limit(10)))
             .then(cSnap => {
-              const comps = cSnap.docs.map(c=>({id:c.id,...c.data()})).filter(c=>c.id!==d.id);
+              const comps = cSnap.docs.map(c=>({id:c.id,...c.data()})).filter(c=>c.id!==d.id && !isArchivedRecord(c));
               comps.sort((a,b)=>(b.averageRating||0)-(a.averageRating||0));
               setCompetitors(comps.slice(0,6));
             })

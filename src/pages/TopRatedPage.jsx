@@ -6,6 +6,7 @@ import CompanyCard from '../components/CompanyCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { getCategoryLabel } from '../utils/helpers';
 import { useThemeStore } from '../store/themeStore';
+import { isArchivedRecord } from '../utils/adminModeration';
 
 const CATS = ['','restaurant','bank','hotel','healthcare','education','electronics','supermarket','telecom'];
 
@@ -38,7 +39,7 @@ export default function TopRatedPage() {
         const stats = reviewStats[d.id] || { total: 0, sum: 0 };
         const avgRating = stats.total > 0 ? parseFloat((stats.sum / stats.total).toFixed(2)) : 0;
         return { id: d.id, ...data, averageRating: avgRating, totalReviews: stats.total };
-      });
+      }).filter(c => !isArchivedRecord(c));
 
       const sorted = companies.sort((a, b) => (b.averageRating - a.averageRating) || (b.totalReviews - a.totalReviews));
       setCompanies(sorted);

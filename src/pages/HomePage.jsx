@@ -8,6 +8,7 @@ import CompanyCard from '../components/CompanyCard';
 import StarRating from '../components/StarRating';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { getCategoryLabel, formatRelativeTime, getRatingColor } from '../utils/helpers';
+import { isArchivedRecord } from '../utils/adminModeration';
 import './HomePage.css';
 import StoriesSection from '../components/StoriesSection';
 import ReviewDetailModal from '../components/ReviewDetailModal';
@@ -69,7 +70,7 @@ export default function HomePage() {
       ]);
       setStats({
         users: uSnap.docs?.length ?? 0,
-        businesses: bSnap.docs?.length ?? 0,
+        businesses: bSnap.docs?.filter(d => !isArchivedRecord(d.data()))?.length ?? 0,
         reviews: rSnap.docs?.length ?? 0,
       });
     } catch (e) { console.error(e); }
@@ -81,13 +82,15 @@ export default function HomePage() {
       const compSnap = await getDocs(
         query(collection(db, 'companies'), orderBy('averageRating', 'desc'), limit(12))
       );
-      const companies = compSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const companies = compSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(c => !isArchivedRecord(c));
       setTopCompanies(companies.slice(0, 6));
     } catch (e) {
       // Fallback if index not ready: load without ordering
       try {
         const compSnap = await getDocs(collection(db, 'companies'));
         const companies = compSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .filter(c => !isArchivedRecord(c))
           .sort((a, b) => (b.averageRating||0) - (a.averageRating||0));
         setTopCompanies(companies.slice(0, 6));
       } catch (e2) { console.error(e2); }
@@ -100,16 +103,23 @@ export default function HomePage() {
       // Load ALL reviews ordered by newest first — no limit
       const snap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc')));
       const reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Batch-fetch company logos for the first 20 visible reviews only (perf)
-      const companyIds = [...new Set(reviews.slice(0, 20).map(r => r.companyId).filter(Boolean))];
+      // Fetch linked companies so archived businesses are hidden from the public feed.
+      const companyIds = [...new Set(reviews.map(r => r.companyId).filter(Boolean))];
       const logoMap = {};
+      const archivedCompanyIds = new Set();
       await Promise.all(companyIds.map(async cid => {
         try {
           const cSnap = await getDoc(doc(db, 'companies', cid));
-          if (cSnap.exists()) logoMap[cid] = cSnap.data().logoUrl || null;
+          if (cSnap.exists()) {
+            const companyData = cSnap.data();
+            if (isArchivedRecord(companyData)) archivedCompanyIds.add(cid);
+            logoMap[cid] = companyData.logoUrl || null;
+          }
         } catch {}
       }));
-      setRecentReviews(reviews.map(r => ({ ...r, companyLogoUrl: logoMap[r.companyId] || null })));
+      setRecentReviews(reviews
+        .filter(r => !archivedCompanyIds.has(r.companyId))
+        .map(r => ({ ...r, companyLogoUrl: logoMap[r.companyId] || null })));
     } catch (e) { console.error(e); }
     setLoadingReviews(false);
   }

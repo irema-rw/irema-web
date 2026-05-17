@@ -10,6 +10,7 @@ import { getCategoryLabel, formatRelativeTime, getRatingColor, getRatingLabel, g
 import { sanitizeUrl } from '../utils/security';
 import { slugify, ensureUniqueSlug, findCompanyBySlug, companyPath } from '../utils/slug';
 import { validateReplyText } from '../utils/reviewLimits';
+import { isArchivedRecord } from '../utils/adminModeration';
 import './CompanyPage.css';
 import StoriesSection from '../components/StoriesSection';
 import ReportReviewModal from '../components/ReportReviewModal';
@@ -79,6 +80,18 @@ export default function CompanyPage() {
   }, [reviews]);
   // Load company once we know which param we got (slug or id).
   useEffect(() => { if (routeSlug || routeId) { loadCompany(); } }, [routeSlug, routeId]);
+  useEffect(() => {
+    function handleBusinessArchiveChanged(e) {
+      if (e.detail?.status === 'archived' && e.detail?.companyId === company?.id) {
+        setCompany(null);
+        setReviews([]);
+        setProducts([]);
+        setLoading(false);
+      }
+    }
+    window.addEventListener('irema:businessArchiveChanged', handleBusinessArchiveChanged);
+    return () => window.removeEventListener('irema:businessArchiveChanged', handleBusinessArchiveChanged);
+  }, [company?.id]);
   // Generate QR once we have the resolved company (so the code points at the canonical URL)
   useEffect(() => { if (company?.id) generateQR(); }, [company?.id, company?.slug]);
 
@@ -141,7 +154,13 @@ export default function CompanyPage() {
         const snap = await getDoc(doc(db, 'companies', routeId));
         if (snap.exists()) resolved = { id: snap.id, ...snap.data() };
       }
-      if (!resolved) { setLoading(false); return; }
+      if (!resolved || isArchivedRecord(resolved)) {
+        setCompany(null);
+        setReviews([]);
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
 
       // Back-fill a slug on the fly for legacy docs that don't have one yet
       // so the URL rewrite below lands on the canonical /business/<slug> path.

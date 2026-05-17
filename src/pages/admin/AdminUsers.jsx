@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../../firebase/config';
+import React, { useState, useEffect } from 'react';
+import { db, functions, httpsCallable } from '../../firebase/config';
 import { useLocation } from 'react-router-dom';
-import { collection, getDocs, deleteDoc, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthStore } from '../../store/authStore';
 import { useAdminPermissions } from '../../hooks/useAdminPermissions';
 import AdminLayout from './AdminLayout';
+import { getNextArchiveAction, getUserStatusBadge, isArchivedRecord } from '../../utils/adminModeration';
 import './AdminPages.css';
 
 const TIME_FILTERS = [
@@ -31,10 +32,12 @@ export default function AdminUsers() {
     return params.get('q') || '';
   });
   const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState(TIME_FILTERS[0]);
   const [loading, setLoading] = useState(true);
   const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [archiveUser, setArchiveUser] = useState(null);
   const [deleteUser, setDeleteUser] = useState(null);
   const [viewUser, setViewUser] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -74,12 +77,14 @@ export default function AdminUsers() {
     let r = [...users];
     if (search) { const q=search.toLowerCase(); r=r.filter(u=>(u.email||'').toLowerCase().includes(q)||(u.displayName||'').toLowerCase().includes(q)); }
     if (roleFilter) r=r.filter(u=>(u.role||'user')===roleFilter);
+    if (statusFilter === 'archived') r = r.filter(u => isArchivedRecord(u));
+    if (statusFilter === 'active') r = r.filter(u => !isArchivedRecord(u));
     if (timeFilter.ms) {
       const cutoff = Date.now() - timeFilter.ms;
       r = r.filter(u => { const t=u.createdAt?.seconds?u.createdAt.seconds*1000:0; return t>=cutoff; });
     }
     setFiltered(r); setPage(1);
-  }, [search, roleFilter, timeFilter, users]);
+  }, [search, roleFilter, statusFilter, timeFilter, users]);
 
   const saveEdit = async () => {
     if (!editUser) return;
@@ -102,12 +107,48 @@ export default function AdminUsers() {
     if (!deleteUser) return;
     setSaving(true);
     try {
-      await deleteDoc(doc(db,'users',deleteUser.id));
-      await addDoc(collection(db,'audit_logs'),{action:'user_deleted',detail:`Deleted user: ${deleteUser.email}`,adminEmail:adminUser?.email,timestamp:serverTimestamp()});
+      const deleteUserData = httpsCallable(functions, 'deleteUserData');
+      await deleteUserData({ uid: deleteUser.id });
       setUsers(prev=>prev.filter(u=>u.id!==deleteUser.id));
       setDeleteUser(null);
-      showToast('User deleted successfully');
+      showToast('User and related data permanently deleted');
     } catch(e){ showToast(e.message,'error'); }
+    setSaving(false);
+  };
+
+  const confirmArchive = async () => {
+    if (!archiveUser) return;
+    const action = getNextArchiveAction(archiveUser, 'user');
+    setSaving(true);
+    try {
+      const update = action.nextStatus === 'archived'
+        ? {
+            status: 'archived',
+            archivedAt: serverTimestamp(),
+            archivedBy: adminUser?.email || null,
+            previousStatus: archiveUser.status || 'active',
+          }
+        : {
+            status: archiveUser.previousStatus && archiveUser.previousStatus !== 'archived'
+              ? archiveUser.previousStatus
+              : 'active',
+            archivedAt: null,
+            archivedBy: null,
+            previousStatus: null,
+          };
+      await updateDoc(doc(db, 'users', archiveUser.id), update);
+      await addDoc(collection(db, 'audit_logs'), {
+        action: action.auditAction,
+        detail: `${action.label}: ${archiveUser.email}`,
+        adminEmail: adminUser?.email,
+        timestamp: serverTimestamp(),
+      });
+      setUsers(prev => prev.map(u => u.id === archiveUser.id ? { ...u, ...update } : u));
+      setArchiveUser(null);
+      showToast(`${archiveUser.displayName || archiveUser.email} ${action.nextStatus === 'archived' ? 'archived' : 'unarchived'} successfully`);
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
     setSaving(false);
   };
 
@@ -167,10 +208,15 @@ export default function AdminUsers() {
             <option value="">All Roles</option>
             {roles.map(r=><option key={r} value={r}>{r}</option>)}
           </select>
+          <select className="ap-filter-select" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+          </select>
           <select className="ap-filter-select" value={timeFilter.label} onChange={e=>setTimeFilter(TIME_FILTERS.find(t=>t.label===e.target.value))}>
             {TIME_FILTERS.map(t=><option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
-          <button className="ap-btn ap-btn-ghost ap-btn-sm" onClick={()=>{setSearch('');setRoleFilter('');setTimeFilter(TIME_FILTERS[0]);}}>↺ Reset</button>
+          <button className="ap-btn ap-btn-ghost ap-btn-sm" onClick={()=>{setSearch('');setRoleFilter('');setStatusFilter('');setTimeFilter(TIME_FILTERS[0]);}}>↺ Reset</button>
           <span className="ap-count-badge">{filtered.length} users</span>
         </div>
 
@@ -181,8 +227,9 @@ export default function AdminUsers() {
             : paginated.length===0 ? <tr><td colSpan="5" className="ap-empty">No users match your filters</td></tr>
             : paginated.map(user => {
               const name = user.displayName || user.firstName || user.email?.split('@')[0] || 'User';
+              const statusBadge = getUserStatusBadge(user);
               return (
-                <tr key={user.id} className="ap-tr-hover">
+                <tr key={user.id} className={`ap-tr-hover${isArchivedRecord(user) ? ' ap-row-inactive' : ''}`}>
                   <td>
                     <div className="ap-user-cell">
                       <div className="ap-avatar" style={{background:`hsl(${name.charCodeAt(0)*13}deg 45% 55%)`}}>{name[0].toUpperCase()}</div>
@@ -192,7 +239,7 @@ export default function AdminUsers() {
                       </div>
                     </div>
                   </td>
-                  <td><span className={`ap-badge ${user.role==='admin'?'teal':user.role==='company_admin'?'blue':'gray'}`}>{user.role||'user'}</span></td>
+                  <td><span className={`ap-badge ${statusBadge.className}`}>{statusBadge.label}</span></td>
                   <td className="ap-td-date">{formatDate(user.createdAt)}</td>
                   <td className="ap-td-date">{user.totalReviews||0}</td>
                   <td>
@@ -205,8 +252,16 @@ export default function AdminUsers() {
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
                       )}
+                      {can('edit_users') && (
+                        <button className={`ap-icon-action-btn ${isArchivedRecord(user) ? 'success' : 'warning'}`} title={isArchivedRecord(user) ? 'Unarchive user' : 'Archive user'} onClick={()=>setArchiveUser(user)}>
+                          {isArchivedRecord(user)
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h18"/><path d="M5 7v13h14V7"/><path d="M9 11l3 3 3-3"/></svg>
+                            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v12h14V8"/><path d="M10 12h4"/></svg>
+                          }
+                        </button>
+                      )}
                       {can('delete_users') && (
-                        <button className="ap-icon-action-btn danger" title="Delete user" onClick={()=>setDeleteUser(user)}>
+                        <button className="ap-icon-action-btn danger" title="Permanently delete user" onClick={()=>setDeleteUser(user)}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                         </button>
                       )}
@@ -250,6 +305,7 @@ export default function AdminUsers() {
                 <div className="ap-view-name">{viewUser.displayName||viewUser.firstName||'—'}</div>
                 <div className="ap-view-email">{viewUser.email}</div>
                 <span className={`ap-badge ${viewUser.role==='admin'?'teal':viewUser.role==='company_admin'?'blue':'gray'}`} style={{marginTop:6}}>{viewUser.role||'user'}</span>
+                {isArchivedRecord(viewUser) && <span className="ap-badge red" style={{marginTop:6,marginLeft:6}}>Archived</span>}
               </div>
             </div>
             <div className="ap-view-grid">
@@ -304,23 +360,53 @@ export default function AdminUsers() {
       )}
 
       {/* Delete Confirm Modal */}
+      {archiveUser && (
+        <div className="ap-modal-overlay" onClick={e=>e.target===e.currentTarget&&setArchiveUser(null)}>
+          <div className="ap-modal ap-modal-sm">
+            <div className="ap-modal-header">
+              <h3>{getNextArchiveAction(archiveUser, 'user').label}</h3>
+              <button className="ap-modal-close" onClick={()=>setArchiveUser(null)}>✕</button>
+            </div>
+            <div className="ap-danger-box">
+              <div className="ap-danger-icon">⚠️</div>
+              <div>
+                <strong>{isArchivedRecord(archiveUser) ? 'Restore this user?' : 'Archive this user?'}</strong>
+                <p>
+                  {isArchivedRecord(archiveUser)
+                    ? <>Unarchiving <strong>{archiveUser.displayName || archiveUser.email}</strong> makes their profile active on the platform again.</>
+                    : <>Archiving <strong>{archiveUser.displayName || archiveUser.email}</strong> hides the user from the platform while keeping their data for future restoration.</>
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="ap-modal-actions">
+              <button className="ap-btn ap-btn-secondary" onClick={()=>setArchiveUser(null)}>{t('admin.cancel')||'Cancel'}</button>
+              <button className={isArchivedRecord(archiveUser) ? 'ap-btn ap-btn-success' : 'ap-btn ap-btn-danger'} onClick={confirmArchive} disabled={saving}>
+                {saving ? getNextArchiveAction(archiveUser, 'user').progressLabel : getNextArchiveAction(archiveUser, 'user').label}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
       {deleteUser && (
         <div className="ap-modal-overlay" onClick={e=>e.target===e.currentTarget&&setDeleteUser(null)}>
           <div className="ap-modal ap-modal-sm">
             <div className="ap-modal-header">
-              <h3>Delete User</h3>
+              <h3>Permanently Delete User</h3>
               <button className="ap-modal-close" onClick={()=>setDeleteUser(null)}>✕</button>
             </div>
             <div className="ap-danger-box">
               <div className="ap-danger-icon">⚠️</div>
               <div>
                 <strong>This action cannot be undone</strong>
-                <p>You are about to permanently delete <strong>{deleteUser.displayName||deleteUser.email}</strong> and all their data. Their reviews will remain but will show as anonymous.</p>
+                <p>You are about to permanently delete <strong>{deleteUser.displayName||deleteUser.email}</strong>, their Auth account, profile, reviews, notifications, claims, support chats, and owned business data where applicable. Use Archive when you only want to hide the user while keeping their data restorable.</p>
               </div>
             </div>
             <div className="ap-modal-actions">
               <button className="ap-btn ap-btn-secondary" onClick={()=>setDeleteUser(null)}>{t('admin.cancel')||'Cancel'}</button>
-              <button className="ap-btn ap-btn-danger" onClick={confirmDelete} disabled={saving}>{saving?'Deleting…':'Delete User'}</button>
+              <button className="ap-btn ap-btn-danger" onClick={confirmDelete} disabled={saving}>{saving?'Deleting...':'Delete Permanently'}</button>
             </div>
           </div>
         </div>

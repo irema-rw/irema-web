@@ -9,6 +9,7 @@ const SEARCH_FETCH_LIMIT = 500;
 import CompanyCard from '../components/CompanyCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { getCategoryLabel } from '../utils/helpers';
+import { isArchivedRecord } from '../utils/adminModeration';
 import './SearchResults.css';
 
 const CATEGORIES = ['restaurant','bank','hotel','healthcare','education','electronics','supermarket','telecom','travel','fitness','real_estate','pharmacy','clothing','other'];
@@ -26,12 +27,24 @@ export default function SearchResults() {
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [searchQ, categoryFilter]);
   useEffect(() => { loadResults(); }, [searchQ, categoryFilter, ratingFilter, sortBy]);
+  useEffect(() => {
+    function handleBusinessArchiveChanged(e) {
+      if (e.detail?.status === 'archived') {
+        setCompanies(prev => prev.filter(c => c.id !== e.detail.companyId));
+      } else {
+        loadResults();
+      }
+    }
+    window.addEventListener('irema:businessArchiveChanged', handleBusinessArchiveChanged);
+    return () => window.removeEventListener('irema:businessArchiveChanged', handleBusinessArchiveChanged);
+  }, [searchQ, categoryFilter, ratingFilter, sortBy]);
 
   async function loadResults() {
     setLoading(true);
     try {
       const snap = await getDocs(query(collection(db, 'companies'), limit(SEARCH_FETCH_LIMIT)));
-      let results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let results = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(c => !isArchivedRecord(c));
       // Search filter — match only on name and category to avoid false positives
       if (searchQ.trim()) {
         const q = searchQ.toLowerCase().trim();
