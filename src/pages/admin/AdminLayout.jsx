@@ -8,6 +8,7 @@ import { getInitials } from '../../utils/helpers';
 import { clearPermissionsCache } from '../../hooks/useAdminPermissions';
 import { LANGUAGES } from '../../constants/languages';
 import ChangePasswordModal from '../../components/ChangePasswordModal';
+import AdminBottomNav from './AdminBottomNav';
 import './AdminLayout.css';
 
 function NavIcon({ d, d2 }) {
@@ -245,6 +246,7 @@ export default function AdminLayout({ children }) {
       {changePwOpen && (
         <ChangePasswordModal onClose={() => { setChangePwOpen(false); }} />
       )}
+      <AdminBottomNav />
     </div>
   );
 }

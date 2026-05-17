@@ -1,0 +1,68 @@
+/* LiveChat — desktop + mobile/PWA aware */
+
+/* ── FAB button ── */
+.livechat-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #2d8f6f;
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(45, 143, 111, 0.35);
+  z-index: 500;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.livechat-fab:hover  { transform: scale(1.08); box-shadow: 0 10px 28px rgba(45,143,111,0.45); }
+.livechat-fab-open   { transform: scale(0.95); }
+
+/* On mobile, lift the button above the bottom nav (60px) + safe area + 12px gap */
+@media (max-width: 1024px) {
+  .livechat-fab {
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 12px);
+    right: 14px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ── Chat panel ── */
+.livechat-panel {
+  position: fixed;
+  bottom: 100px;
+  right: 24px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  height: 500px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+  display: flex;
+  flex-direction: column;
+  z-index: 499;
+  overflow: hidden;
+}
+
+/* On mobile, make panel fill most of the screen above the bottom nav */
+@media (max-width: 1024px) {
+  .livechat-panel {
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 68px); /* above FAB */
+    right: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px) - 140px);
+    min-height: 280px;
+    border-radius: 16px 16px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+}

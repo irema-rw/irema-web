@@ -78,7 +78,8 @@
 .sort-btn.active,.sort-btn:hover { background:var(--brand-xlight); color:var(--brand-dark); border-color:var(--brand-light); }
 
 /* Review widgets grid */
-.review-widgets-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+.review-widgets-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+@media(max-width:900px){ .review-widgets-grid { grid-template-columns:repeat(2,1fr); } }
 @media(max-width:600px){ .review-widgets-grid { grid-template-columns:1fr; } }
 
 .review-widget {

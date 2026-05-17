@@ -565,14 +565,23 @@ p  { color:var(--text-3); line-height:1.7; }
   body { overflow-x: hidden; }
   .container { padding: 0 16px; }
 
-  /* Modal full-screen on mobile */
-  .modal { margin: 0; border-radius: 20px 20px 0 0; position: fixed; bottom: 0; left: 0; right: 0; max-height: 92vh; overflow-y: auto; }
-  .modal-overlay { align-items: flex-end; }
+  /* Modal — centred on mobile (not bottom sheet) */
+  .modal { margin: 16px; border-radius: 20px; max-height: 92vh; overflow-y: auto; width: auto; }
+  .modal-overlay { align-items: center; justify-content: center; }
 
-  /* Better tap targets */
-  button, a, input, select, textarea { min-height: 44px; }
+  /* Better tap targets — only for interactive inputs, not all buttons (avoids elongation) */
+  input, select, textarea { min-height: 44px; }
   select { font-size: 16px !important; } /* prevents iOS zoom on focus */
   input[type="text"], input[type="email"], input[type="password"] { font-size: 16px !important; }
+
+  /* Modal buttons: full-width, properly sized on mobile */
+  .modal .btn { width: 100%; justify-content: center; padding: 13px 20px; font-size: 0.95rem; }
+  .modal .btn + .btn { margin-top: 8px; }
+  .modal-actions { flex-direction: column; gap: 8px; }
+
+  /* Bottom-sheet modal slides up from bottom */
+  .modal { padding: 24px 20px 28px; }
+  .modal-close-btn { top: 14px; right: 14px; }
 
   /* Footer mobile */
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
@@ -734,4 +743,18 @@ p  { color:var(--text-3); line-height:1.7; }
   40% { transform: translateX(8px); }
   60% { transform: translateX(-4px); }
   80% { transform: translateX(4px); }
+}
+
+/* ── PWA / iOS Safari ────────────────────────────────────────────────
+   Prevent Safari from auto-zooming when the user taps an input whose
+   font-size is < 16 px. max(16px, 1em) keeps larger type unchanged. */
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select {
+    font-size: max(16px, 1em);
+  }
+}
+/* Standalone PWA — remove tap highlight and prevent pull-to-refresh */
+@media (display-mode: standalone) {
+  * { -webkit-tap-highlight-color: transparent; }
+  body { overscroll-behavior-y: none; }
 }

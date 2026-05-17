@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background circle with brand color -->
+  <rect width="512" height="512" rx="112" fill="#1ECAB8"/>
+  <!-- Star shape in gold — the Irema brand mark -->
+  <polygon
+    points="256,80 296,176 400,176 318,238 348,338 256,276 164,338 194,238 112,176 216,176"
+    fill="#E8B800"
+  />
+  <!-- Subtle inner star highlight -->
+  <polygon
+    points="256,110 288,190 384,190 308,244 334,328 256,272 178,328 204,244 128,190 224,190"
+    fill="rgba(255,255,255,0.18)"
+  />
+  <!-- Center dot -->
+  <circle cx="256" cy="216" r="24" fill="rgba(255,255,255,0.55)"/>
+</svg>
