@@ -12,12 +12,11 @@ import ReviewModal from '../components/ReviewModal';
 import FreeMetricsPanel from '../components/FreeMetricsPanel';
 import MiddleMetricsPanel from '../components/MiddleMetricsPanel';
 import PremiumMetricsPanel from '../components/PremiumMetricsPanel';
-import AnalyticsTrialCountdown from '../components/AnalyticsTrialCountdown';
-import AnalyticsUpgradePrompt from '../components/AnalyticsUpgradePrompt';
-import TierComparison from '../components/TierComparison';
+// AnalyticsTrialCountdown, AnalyticsUpgradePrompt, TierComparison removed — analytics tier is plan-derived
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
 import { canStartProfessionalTrial } from '../utils/subscriptionAccess';
-import { validateReplyText } from '../utils/reviewLimits';
+import PaymentModal from '../components/PaymentModal';
+import BizBottomNav from '../components/BizBottomNav';
 
 /* ── Brand Logo ── */
 function BizLogo() {
@@ -83,9 +82,7 @@ function getNav(t, company, subStatus) {
     { id:'analytics',      label:t('cd.analytics')||'Analytics',        icon:'M18 20V10 M12 20V4 M6 20v-6' },
     { id:'competitors',    label:t('cd.market_insights')||'Market Insights',  icon:'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
     { id:'profile',        label:t('cd.business_profile')||'Business Profile', icon:'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
-    { id:'subscription',   label:t('cd.subscription')||'Subscription',     icon:'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3z' },
-    { id:'analytics-tier', label:'Analytics Subscription',  icon:'M16 6l2.293-2.293a1 1 0 011.414 0l2.586 2.586a1 1 0 010 1.414L20 9m-4-4v12a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2h-8a2 2 0 00-2 2' },
-    { id:'payments',       label:'Payments',            icon:'M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm0-12C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z' },
+    { id:'plans', label:'Plans', icon:'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3z' },
     { id:'notifications',  label:t('cd.notifications')||'Notifications',    icon:'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0' },
     { id:'qrcode',         label:'QR Code',                                   icon:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h3v3h-3z M20 14h1v1h-1z M17 17h3v3h-3z M20 20h1v1h-1z' },
     ...(subStatus.hasAccess('company_stories') ? [{ id:'stories', label:'Stories', icon:'M15 10l4.553-2.069A1 1 0 0 1 21 8.871V15.13a1 1 0 0 1-1.447.9L15 14M3 8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z' }] : []),
@@ -94,15 +91,76 @@ function getNav(t, company, subStatus) {
 }
 
 const PLANS = [
-  { id:'starter', name:'Starter', price:0, currency:'RWF', period:'month',
-    features:['1 business listing','Unlimited reviews from customers','Respond to up to 50 reviews','Basic analytics','Email notifications','Community badge'],
-    cta:'Get Started Free', highlight:false },
-  { id:'professional', name:'Professional', price:25000, currency:'RWF', period:'month',
-    features:['1 business listing','Unlimited reviews','Unlimited responses to reviews','Advanced analytics + charts','Priority support','Verified badge','QR code downloads','Competitor insights'],
-    cta:'Get Professional', highlight:true },
-  { id:'enterprise', name:'Enterprise', price:75000, currency:'RWF', period:'month',
-    features:['Up to 5 listings','Unlimited everything','Unlimited responses','AI sentiment analysis','Dedicated account manager','Custom integrations','White-label widgets','API access','SLA support','Product listings on your page'],
-    cta:'Get Enterprise', highlight:false },
+  {
+    id: 'starter', name: 'Starter', price: 0, currency: 'RWF', period: 'month',
+    tagline: 'Everything a new business needs to get started',
+    highlight: false, cta: 'Get Started Free',
+    features: [
+      '1 business listing',
+      'Unlimited reviews from customers',
+      'Respond to up to 50 reviews',
+      'Email notifications',
+      'Community badge',
+      '14-day free trial on signup',
+    ],
+    analyticsFeatures: [
+      'Avg Rating',
+      'Total Reviews',
+      'Response Rate',
+      'Top Complaint',
+      'Rating Distribution',
+      'Review Count This Month',
+    ],
+  },
+  {
+    id: 'professional', name: 'Professional', price: 25000, currency: 'RWF', period: 'month',
+    tagline: 'Growth tools + advanced insights',
+    highlight: true, cta: 'Get Professional',
+    features: [
+      '1 business listing',
+      'Unlimited reviews',
+      'Unlimited responses to reviews',
+      'Verified badge',
+      'QR code downloads',
+      'Priority support',
+      'Competitor insights',
+    ],
+    analyticsFeatures: [
+      'Everything in Starter analytics',
+      'Sentiment score & analysis',
+      'Positive / Negative % breakdown',
+      'Competitor benchmarking & rank',
+      'Trend forecasting & growth rate',
+      'Price perception score',
+      'Product Quality Score',
+      'Review velocity',
+      'Top praised & complaint themes',
+    ],
+  },
+  {
+    id: 'enterprise', name: 'Enterprise', price: 75000, currency: 'RWF', period: 'month',
+    tagline: 'Full platform access + AI',
+    highlight: false, cta: 'Get Enterprise',
+    features: [
+      'Up to 5 business listings',
+      'Unlimited everything',
+      'Unlimited responses',
+      'AI sentiment analysis',
+      'Dedicated account manager',
+      'Custom integrations',
+      'White-label widgets',
+      'API access',
+      'SLA support',
+      'Product listings on your page',
+    ],
+    analyticsFeatures: [
+      'Everything in Professional analytics',
+      'AI-powered recommendations',
+      'Revenue forecasting',
+      'Executive reports',
+      'Full premium metrics dashboard',
+    ],
+  },
 ];
 
 /* ── QR Code Section ── */
@@ -311,11 +369,10 @@ export default function CompanyDashboard() {
     responseRate: true,
   });
   const [analyticsMetrics, setAnalyticsMetrics] = useState(null);
-  const [analyticsAccessLevel, setAnalyticsAccessLevel] = useState('free');
-  const [isOnTrial, setIsOnTrial] = useState(false);
-  const [trialDaysRemaining, setTrialDaysRemaining] = useState(0);
+  // analyticsAccessLevel is now derived from effectivePlan in subscriptionAccess.js — no local state needed
   const [paymentHistory, setPaymentHistory] = useState([]);
-  const [paymentsTab, setPaymentsTab] = useState('methods'); // 'methods' | 'history'
+  const [paymentsTab, setPaymentsTab] = useState('plans'); // 'plans' | 'invoices'
+  const [paymentModal, setPaymentModal] = useState(null); // null | { plan }
   const [trialStarting, setTrialStarting] = useState(false);
   const chartRefs = useRef({});
   const dropRef = useRef(null);
@@ -482,28 +539,14 @@ export default function CompanyDashboard() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  // Load analytics metrics and check trial status
+  // Load analytics metrics
   useEffect(() => {
-    if (!company?.id || !subscription) return;
-
-    // Analytics state now sourced from useSubscriptionStatus hook
-    // (handles expiry downgrade automatically)
-    setAnalyticsAccessLevel(subStatus.analyticsAccessLevel);
-    setTrialDaysRemaining(subStatus.analyticsTrialDaysLeft);
-    setIsOnTrial(subStatus.isOnAnalyticsTrial);
-
-    // Fetch latest analytics metrics
+    if (!company?.id) return;
     const today = new Date().toISOString().split('T')[0];
     getDoc(doc(db, 'analytics_metrics', company.id, 'daily', `daily_${today}`))
-      .then(docSnap => {
-        if (docSnap.exists()) {
-          setAnalyticsMetrics(docSnap.data());
-        }
-      })
-      .catch(() => {
-        // Metrics not yet calculated, will show default state
-      });
-  }, [company?.id, subscription, subStatus.analyticsAccessLevel, subStatus.analyticsTrialDaysLeft, subStatus.isOnAnalyticsTrial]);
+      .then(docSnap => { if (docSnap.exists()) setAnalyticsMetrics(docSnap.data()); })
+      .catch(() => {});
+  }, [company?.id]);
 
   // Analytics charts
   const drawCharts = useCallback(() => {
@@ -573,21 +616,37 @@ export default function CompanyDashboard() {
 
   }, [reviews]);
 
-  // Load payment history
-  useEffect(() => {
+  // Load payment history — merge invoices (paid) + pending/failed payments
+  const loadPaymentHistory = useCallback(async () => {
     if (!company?.id || !currentUser) return;
-    getDocs(query(collection(db, 'payments'), where('companyId', '==', company.id), orderBy('createdAt', 'desc')))
-      .then(snap => {
-        const payments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setPaymentHistory(payments);
-      })
-      .catch(e => {
-        // Silently fail on permission errors (e.g., during logout)
-        if (e.code !== 'permission-denied') {
-          console.error('Error loading payments:', e);
-        }
+    try {
+      // 1. Paid invoices (written by checkMoMoPaymentStatus on success)
+      const invSnap = await getDocs(
+        query(collection(db, 'invoices'), where('companyId', '==', company.id), orderBy('issuedAt', 'desc'))
+      );
+      const invoices = invSnap.docs.map(d => ({ id: d.id, _source: 'invoice', ...d.data() }));
+
+      // 2. Pending / failed payments (not yet in invoices)
+      const paySnap = await getDocs(
+        query(collection(db, 'payments'), where('companyId', '==', company.id), orderBy('createdAt', 'desc'))
+      );
+      const pendingPayments = paySnap.docs
+        .map(d => ({ id: d.id, _source: 'payment', ...d.data() }))
+        .filter(p => p.status !== 'successful'); // successful ones are already in invoices
+
+      // Merge and sort by date desc
+      const all = [...invoices, ...pendingPayments].sort((a, b) => {
+        const ta = (a.issuedAt || a.createdAt)?.seconds || 0;
+        const tb = (b.issuedAt || b.createdAt)?.seconds || 0;
+        return tb - ta;
       });
+      setPaymentHistory(all);
+    } catch (e) {
+      if (e.code !== 'permission-denied') console.error('Error loading payments:', e);
+    }
   }, [company?.id, currentUser]);
+
+  useEffect(() => { loadPaymentHistory(); }, [loadPaymentHistory]);
 
   useEffect(() => {
     if (section !== 'analytics') return;
@@ -606,12 +665,7 @@ export default function CompanyDashboard() {
     if (!company) { showToast('Company not loaded','error'); return; }
     if (!canReplyToReviews) {
       showToast('Replying to reviews is available on Professional and Enterprise plans.', 'error');
-      setSection('subscription');
-      return;
-    }
-    const validation = validateReplyText(replyText);
-    if (!validation.ok) {
-      showToast(validation.message, 'error');
+      setSection('plans');
       return;
     }
 
@@ -930,7 +984,7 @@ export default function CompanyDashboard() {
           textAlign:'center', padding:'10px 20px', fontSize:'0.85rem', fontWeight:700, position:'sticky', top:0, zIndex:200}}>
           {subStatus.trialDaysLeft <= 3 ? '🚨' : '⏳'} Professional Trial: <strong>{subStatus.trialDaysLeft} day{subStatus.trialDaysLeft!==1?'s':''} remaining</strong>
           {subStatus.trialDaysLeft <= 3 ? '. Upgrade now to keep your features!' : '. Enjoy your free trial!'}
-          <button onClick={()=>setSection('subscription')}
+          <button onClick={()=>setSection('plans')}
             style={{marginLeft:12,padding:'3px 12px',borderRadius:99,border:'none',
               background: subStatus.trialDaysLeft<=3?'white':'#1a1200', color: subStatus.trialDaysLeft<=3?'#ef4444':'#e8b800',
               fontWeight:700,fontSize:'0.78rem',cursor:'pointer'}}>
@@ -949,7 +1003,7 @@ export default function CompanyDashboard() {
         <div className="biz-navbar-inner">
           <a href="/" className="biz-nav-brand">
             <BizLogo />
-            <span className="biz-nav-brandname">Irema <span>Business</span></span>
+            <span className="biz-nav-brandname">Irema</span>
           </a>
           <div className="biz-nav-right">
             {/* Language switcher */}
@@ -987,14 +1041,12 @@ export default function CompanyDashboard() {
                     <div className="biz-drop-email">{currentUser?.email}</div>
                   </div>
                   <hr className="biz-drop-hr"/>
-                  <button className="biz-drop-item" onClick={()=>{setSection('profile');setDropOpen(false);}}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    Edit Profile
-                  </button>
-                  <button className="biz-drop-item" onClick={()=>{setDropOpen(false);setBizChangePwOpen(true);}}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    Change Password
-                  </button>
+                  {currentUser?.providerData?.[0]?.providerId !== 'google.com' && (
+                    <button className="biz-drop-item" onClick={()=>{setDropOpen(false);setBizChangePwOpen(true);}}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      Change Password
+                    </button>
+                  )}
                   <hr className="biz-drop-hr"/>
                   <button className="biz-drop-item biz-drop-logout" onClick={logout}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -1122,7 +1174,7 @@ export default function CompanyDashboard() {
                     <strong>{t('cd.get_verified')||'Get Verified'}</strong>
                     <p>{t('cd.get_verified_desc')||'Verified businesses get 3× more clicks and higher trust from customers. Contact our team to complete verification.'}</p>
                   </div>
-                  <button className="biz-btn biz-btn-sm" onClick={()=>setSection('subscription')}>{t('cd.upgrade')||'Upgrade'} →</button>
+                  <button className="biz-btn biz-btn-sm" onClick={()=>setSection('plans')}>{t('cd.upgrade')||'Upgrade'} →</button>
                 </div>
               )}
             </div>
@@ -1161,7 +1213,7 @@ export default function CompanyDashboard() {
                     <div style={{fontWeight:800,color:'var(--biz-text-1)',marginBottom:4}}>Replies are a Professional feature</div>
                     <div style={{fontSize:'0.88rem',color:'var(--biz-text-2)'}}>You can still read every customer review. Upgrade when you are ready to respond as the business.</div>
                   </div>
-                  <button className="biz-btn biz-btn-primary" onClick={()=>setSection('subscription')}>Upgrade to Reply</button>
+                  <button className="biz-btn biz-btn-primary" onClick={()=>setSection('plans')}>Upgrade to Reply</button>
                 </div>
               )}
               {/* Widget card grid — click any card to open ReviewModal */}
@@ -1206,31 +1258,37 @@ export default function CompanyDashboard() {
                 <p className="biz-page-sub">{t('cd.analytics_sub')||'Powered by real data from your Irema profile'}</p>
               </div>
 
-              {!canViewAnalytics ? (
-                <div className="biz-card" style={{borderColor:'var(--biz-brand)',background:'rgba(45,143,111,0.08)'}}>
-                  <h2 style={{marginTop:0}}>Analytics are available on Professional and Enterprise</h2>
-                  <p style={{color:'var(--biz-text-2)',marginBottom:18}}>Starter businesses can manage their profile and read reviews. Upgrade to unlock analytics dashboards, trends, and performance insights.</p>
-                  <button className="biz-btn biz-btn-primary" onClick={()=>setSection('subscription')}>View Paid Plans</button>
+              {/* Plan trial countdown banner */}
+              {subStatus.isTrial && subStatus.trialDaysLeft > 0 && (
+                <div style={{marginBottom:16,padding:'10px 16px',borderRadius:10,background:'rgba(232,184,0,0.12)',border:'1px solid rgba(232,184,0,0.4)',fontSize:'0.88rem',color:'var(--biz-text-1)',display:'flex',alignItems:'center',gap:8}}>
+                  ⏳ <strong>Professional trial:</strong>&nbsp;{subStatus.trialDaysLeft} day{subStatus.trialDaysLeft!==1?'s':''} remaining.
+                  <button style={{marginLeft:'auto',fontSize:'0.8rem',background:'var(--biz-brand)',color:'white',border:'none',borderRadius:6,padding:'4px 12px',cursor:'pointer',fontWeight:600}} onClick={()=>setPaymentModal({plan:PLANS.find(p=>p.id==='professional')})}>
+                    Keep Professional
+                  </button>
                 </div>
-              ) : (
+              )}
+
+              {/* Analytics panel — level derived from plan */}
+              {subStatus.analyticsAccessLevel === 'free' ? (
                 <>
+                  <FreeMetricsPanel metrics={calculatedMetrics} category={company?.category} company={company} />
+                  {/* Upsell nudge */}
+                  <div className="biz-card" style={{marginTop:20,display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap',borderColor:'var(--biz-brand)',background:'rgba(45,143,111,0.05)'}}>
+                    <div>
+                      <div style={{fontWeight:700,marginBottom:4,color:'var(--biz-text-1)'}}>Unlock Advanced Analytics</div>
+                      <div style={{fontSize:'0.85rem',color:'var(--biz-text-2)'}}>Sentiment analysis, competitor benchmarking, growth trends and more — included in Professional.</div>
+                    </div>
+                    <button className="biz-btn biz-btn-primary" style={{flexShrink:0}} onClick={()=>setSection('plans')}>View Plans</button>
+                  </div>
+                </>
+              ) : subStatus.analyticsAccessLevel === 'middle' ? (
+                <MiddleMetricsPanel metrics={calculatedMetrics} category={company?.category} company={company} />
+              ) : (
+                <PremiumMetricsPanel metrics={calculatedMetrics} category={company?.category} company={company} />
+              )}
 
-              {/* Trial Countdown */}
-               {subStatus.isOnAnalyticsTrial && <AnalyticsTrialCountdown daysRemaining={subStatus.analyticsTrialDaysLeft} />}
-
-               {/* Tier-Gated Analytics Display */}
-               {subStatus.analyticsAccessLevel === 'free' && !subStatus.isOnAnalyticsTrial && (
-                 <FreeMetricsPanel metrics={calculatedMetrics} category={company?.category} company={company} />
-               )}
-               {subStatus.analyticsAccessLevel === 'middle' && (
-                 <MiddleMetricsPanel metrics={calculatedMetrics} category={company?.category} company={company} />
-               )}
-               {subStatus.analyticsAccessLevel === 'premium' && (
-                 <PremiumMetricsPanel metrics={calculatedMetrics} category={company?.category} company={company} />
-               )}
-               {subStatus.isOnAnalyticsTrial && (
-                 <MiddleMetricsPanel metrics={calculatedMetrics} category={company?.category} company={company} />
-               )}
+              {/* Keep charts section — only show for paid plans */}
+              {subStatus.analyticsAccessLevel !== 'free' && (<>
 
               {/* Charts Section */}
               {reviews.length > 0 && (
@@ -1272,18 +1330,7 @@ export default function CompanyDashboard() {
                 </div>
               )}
 
-              {/* Upgrade Prompt */}
-              {(subStatus.analyticsAccessLevel === 'free' || subStatus.isOnAnalyticsTrial) && (
-                <AnalyticsUpgradePrompt
-                  currentTier={subStatus.analyticsAccessLevel}
-                  category={company?.category}
-                  onUpgradeSelect={(tier) => {
-                    setSection('payments');
-                  }}
-                />
-              )}
-                </>
-              )}
+              </>)}
             </div>
           )}
 
@@ -1511,7 +1558,7 @@ export default function CompanyDashboard() {
                       </div>
                       {(company?.photos||[]).length === 0 ? (
                         <div style={{padding:'24px',textAlign:'center',background:'var(--biz-bg-2)',borderRadius:10,border:'2px dashed var(--biz-border)'}}>
-                          <div style={{fontSize:'2rem',marginBottom:8}}>🏢</div>
+                          <div style={{marginBottom:8,display:'flex',justifyContent:'center'}}><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--biz-text-3)" strokeWidth="1.5" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
                           <p style={{color:'var(--biz-text-3)',fontSize:'0.85rem',margin:0}}>
                             No photos yet. Add photos to make your profile stand out — they'll appear as the banner on your public Irema page.
                           </p>
@@ -1603,294 +1650,214 @@ export default function CompanyDashboard() {
           )}
 
           {/* ─ SUBSCRIPTION ─ */}
-          {section==='subscription' && (
+          {/* ─ PLANS (merged Subscription + Analytics Subscription) ─ */}
+          {section==='plans' && (
             <div className="biz-content">
               <div className="biz-page-header">
-                <h1>{t('cd.subscription_plans')||'Subscription Plans'}</h1>
-                <p className="biz-page-sub">{t('cd.subscription_sub')||'Choose the right plan for your business — priced for Rwanda'}</p>
+                <h1>Plans</h1>
+                <p className="biz-page-sub">Choose the right plan for your business — priced for Rwanda</p>
               </div>
-              {canStartTrial && (
-                <div className="biz-card" style={{
-                  marginBottom: 20,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                  flexWrap: 'wrap',
-                  borderColor: 'var(--biz-brand)',
-                  background: 'linear-gradient(90deg, rgba(45,143,111,0.10), rgba(232,184,0,0.10))'
-                }}>
-                  <div>
-                    <div style={{fontWeight:800,color:'var(--biz-text-1)',marginBottom:4}}>Start your 14-day Professional trial</div>
-                    <div style={{fontSize:'0.88rem',color:'var(--biz-text-2)'}}>Unlock replies, advanced analytics, QR code downloads, competitor insights, and more.</div>
-                  </div>
-                  <button className="biz-btn biz-btn-primary" onClick={startProfessionalTrial} disabled={trialStarting}>
-                    {trialStarting ? 'Starting...' : 'Start Free Trial'}
-                  </button>
-                </div>
-              )}
-              <div className="biz-plans-grid">
-                {PLANS.map(plan=>(
-                  <div key={plan.id} className={`biz-plan-card${plan.highlight?' biz-plan-highlight':''}`}>
-                    {plan.highlight && <div className="biz-plan-popular">{t('cd.most_popular')||'Most Popular'}</div>}
-                    <div className="biz-plan-header">
-                      <div className="biz-plan-name">{plan.name}</div>
-                      <div className="biz-plan-price">
-                        {plan.price===0 ? <span>Free</span> : <><strong>{plan.price.toLocaleString()}</strong> <span>RWF/mo</span></>}
-                      </div>
-                      {plan.price>0 && <div className="biz-plan-usd">≈ ${Math.round(plan.price/1300)}/mo USD</div>}
-                    </div>
-                    <ul className="biz-plan-features">
-                      {plan.features.map(f=><li key={f}><span className="biz-plan-check">✓</span>{f}</li>)}
-                    </ul>
-                    {(()=>{
-                      const PLAN_RANK = { starter: 0, professional: 1, enterprise: 2 };
-                      const effectivePlan = subStatus.effectivePlan;
-                      const isCurrentPlan = effectivePlan === plan.id;
-                      const isTrialActive = subStatus.isTrial && plan.id === 'professional';
-                      const isDowngrade = effectivePlan && PLAN_RANK[plan.id] < PLAN_RANK[effectivePlan];
 
-                      // No CTA for downgrades or non-current starter
-                      if (plan.id === 'starter' || isDowngrade) {
-                        if (!isCurrentPlan) return null;
-                        return <button className="biz-btn biz-plan-btn biz-btn-outline" disabled>✓ Current Plan</button>;
+              {/* Tabs: Plans | Invoices */}
+              <div style={{display:'flex',gap:8,marginBottom:24,borderBottom:'1px solid var(--biz-border)',paddingBottom:12}}>
+                {[['plans','Plans'],['invoices',`Invoices${paymentHistory.length ? ` (${paymentHistory.length})` : ''}`]].map(([tab,label]) => (
+                  <button key={tab} onClick={() => setPaymentsTab(tab)} style={{
+                    padding:'8px 16px', border:'none', background:'none', cursor:'pointer',
+                    fontSize:'0.95rem', fontWeight:paymentsTab===tab?700:500,
+                    color:paymentsTab===tab?'var(--biz-text-1)':'var(--biz-text-3)',
+                    borderBottom:paymentsTab===tab?'2px solid var(--biz-brand)':'2px solid transparent',
+                    marginBottom:'-13px', paddingBottom:'20px', transition:'color 0.15s',
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {/* ── Plans Tab ── */}
+              {paymentsTab === 'plans' && (
+                <div>
+                  {/* 14-day trial banner */}
+                  {canStartTrial && (
+                    <div className="biz-card" style={{marginBottom:20,display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap',borderColor:'var(--biz-brand)',background:'linear-gradient(90deg,rgba(45,143,111,0.10),rgba(232,184,0,0.10))'}}>
+                      <div>
+                        <div style={{fontWeight:800,color:'var(--biz-text-1)',marginBottom:4}}>Start your 14-day Professional trial</div>
+                        <div style={{fontSize:'0.88rem',color:'var(--biz-text-2)'}}>Unlock unlimited replies, advanced analytics, competitor benchmarking, QR codes, and more — free for 14 days.</div>
+                      </div>
+                      <button className="biz-btn biz-btn-primary" onClick={startProfessionalTrial} disabled={trialStarting}>
+                        {trialStarting ? 'Starting…' : 'Start Free Trial'}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="biz-plans-grid">
+                    {PLANS.map(plan => {
+                      const PLAN_RANK_MAP = { starter: 0, professional: 1, enterprise: 2 };
+                      const effectivePlan = subStatus.effectivePlan || 'starter';
+                      const isCurrentPlan = effectivePlan === plan.id && !subStatus.isExpired;
+                      const isTrialPlan = subStatus.isTrial && plan.id === subStatus.subscription?.plan;
+                      const isRenewable = subStatus.isExpired && subStatus.subscription?.plan === plan.id;
+                      const isUpgrade = PLAN_RANK_MAP[plan.id] > PLAN_RANK_MAP[effectivePlan];
+
+                      let ctaEl = null;
+                      if (plan.id === 'starter') {
+                        ctaEl = <button className="biz-btn biz-plan-btn biz-btn-outline" disabled={isCurrentPlan}>
+                          {isCurrentPlan ? '✓ Current Plan' : 'Free — No Payment Needed'}
+                        </button>;
+                      } else if (isCurrentPlan) {
+                        ctaEl = <button className="biz-btn biz-plan-btn biz-btn-outline" disabled>
+                          {isTrialPlan ? `⏱ Trial — ${subStatus.trialDaysLeft ?? '?'} days left` : '✓ Current Plan'}
+                        </button>;
+                      } else if (isRenewable) {
+                        ctaEl = (
+                          <button
+                            className={`biz-btn biz-plan-btn${plan.highlight?' biz-btn-primary':' biz-btn-outline'}`}
+                            onClick={() => setPaymentModal({ plan })}>
+                            🔄 Renew Plan
+                          </button>
+                        );
+                      } else if (isUpgrade) {
+                        ctaEl = (
+                          <button
+                            className={`biz-btn biz-plan-btn${plan.highlight?' biz-btn-primary':' biz-btn-outline'}`}
+                            onClick={async () => {
+                              if (plan.id === 'professional' && canStartTrial) {
+                                await startProfessionalTrial();
+                              } else {
+                                setPaymentModal({ plan });
+                              }
+                            }}>
+                            ⚡ {plan.cta}
+                          </button>
+                        );
                       }
 
                       return (
-                        <button
-                          className={`biz-btn biz-plan-btn${plan.highlight?' biz-btn-primary':' biz-btn-outline'}`}
-                          disabled={isCurrentPlan || isTrialActive}
-                          onClick={async ()=>{
-                            if (plan.id === 'professional') {
-                              await startProfessionalTrial();
-                            } else if (plan.id === 'enterprise') {
-                              setEnterpriseModal(true);
-                            }
-                          }}>
-                          {isCurrentPlan ? '✓ Current Plan' : isTrialActive ? `Trial Active — ${subStatus.trialDaysLeft ?? '?'} days left` : plan.cta}
-                        </button>
-                      );
-                    })()}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+                        <div key={plan.id} className={`biz-plan-card${plan.highlight?' biz-plan-highlight':''}`}>
+                          {plan.highlight && <div className="biz-plan-popular">Most Popular</div>}
+                          <div className="biz-plan-header">
+                            <div className="biz-plan-name">{plan.name}</div>
+                            {plan.tagline && <div style={{fontSize:'0.82rem',color:'var(--biz-text-3)',marginBottom:8}}>{plan.tagline}</div>}
+                            <div className="biz-plan-price">
+                              {plan.price === 0 ? <span>Free</span> : <><strong>{plan.price.toLocaleString()}</strong> <span>RWF/mo</span></>}
+                            </div>
+                            {plan.price > 0 && <div className="biz-plan-usd">≈ ${Math.round(plan.price / 1300)}/mo USD</div>}
+                          </div>
 
-          {/* ─ ANALYTICS SUBSCRIPTION ─ */}
-          {section==='analytics-tier' && (
-            <div className="biz-content">
-              <div className="biz-page-header">
-                <h1>📊 Analytics Subscription</h1>
-                <p className="biz-page-sub">Unlock advanced insights and grow your {company?.category || 'business'}</p>
-              </div>
+                          {/* Platform features */}
+                          <ul className="biz-plan-features">
+                            {plan.features.map(f => <li key={f}><span className="biz-plan-check">✓</span>{f}</li>)}
+                          </ul>
 
-              {company?.category ? (
-                <div className="biz-card">
-                  <TierComparison
-                    currentTier={subStatus.analyticsAccessLevel}
-                    category={company.category}
-                    onSelectTier={async (tier) => {
-                      if (tier === 'free') {
-                        showToast('You\'re already on the free tier', 'success');
-                        return;
-                      }
+                          {/* Analytics features */}
+                          {plan.analyticsFeatures?.length > 0 && (
+                            <>
+                              <div style={{fontSize:'0.72rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--biz-brand)',margin:'14px 0 6px',opacity:0.85}}>
+                                📊 Analytics Included
+                              </div>
+                              <ul className="biz-plan-features">
+                                {plan.analyticsFeatures.map(f => <li key={f}><span className="biz-plan-check">✓</span>{f}</li>)}
+                              </ul>
+                            </>
+                          )}
 
-                      // Create payment record for tier upgrade
-                      try {
-                        await addDoc(collection(db, 'payments'), {
-                          companyId: company.id,
-                          businessName: company.companyName,
-                          type: 'analytics',
-                          tier,
-                          description: `${company.category} Analytics - ${tier} tier`,
-                          status: 'pending',
-                          createdAt: serverTimestamp(),
-                        });
-
-                        // Update subscription
-                        if (subStatus.subscription?.id) {
-                          await updateDoc(doc(db, 'subscriptions', subStatus.subscription.id), {
-                            analyticsAccessLevel: tier,
-                            analyticsCategoryTier: {
-                              [company.category]: tier,
-                            },
-                            updatedAt: serverTimestamp(),
-                          });
-                        }
-
-                        // Update local state
-                        setAnalyticsAccessLevel(tier);
-                        showToast(`✓ Upgraded to ${tier} tier! Payment will be processed.`, 'success');
-                      } catch (err) {
-                        showToast('Error upgrading tier: ' + err.message, 'error');
-                      }
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="biz-empty">
-                  <p>Please select a business category first to see analytics tiers.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ─ PAYMENTS ─ */}
-          {section==='payments' && (
-            <div className="biz-content">
-              <div className="biz-page-header">
-                <h1>Payments</h1>
-                <p className="biz-page-sub">Manage payment methods and view invoices</p>
-              </div>
-
-              {/* Tabbed Navigation */}
-              <div style={{display:'flex',gap:8,marginBottom:24,borderBottom:'1px solid var(--biz-border)',paddingBottom:12}}>
-                <button
-                  onClick={() => setPaymentsTab('methods')}
-                  style={{
-                    padding:'8px 16px',
-                    border:'none',
-                    background:'none',
-                    cursor:'pointer',
-                    fontSize:'0.95rem',
-                    fontWeight:paymentsTab==='methods'?700:500,
-                    color:paymentsTab==='methods'?'var(--biz-text-1)':'var(--biz-text-3)',
-                    borderBottom:paymentsTab==='methods'?'2px solid var(--biz-brand)':'none',
-                    marginBottom:'-12px',
-                    paddingBottom:'20px'
-                  }}
-                >
-                  Payment Methods
-                </button>
-                <button
-                  onClick={() => setPaymentsTab('history')}
-                  style={{
-                    padding:'8px 16px',
-                    border:'none',
-                    background:'none',
-                    cursor:'pointer',
-                    fontSize:'0.95rem',
-                    fontWeight:paymentsTab==='history'?700:500,
-                    color:paymentsTab==='history'?'var(--biz-text-1)':'var(--biz-text-3)',
-                    borderBottom:paymentsTab==='history'?'2px solid var(--biz-brand)':'none',
-                    marginBottom:'-12px',
-                    paddingBottom:'20px'
-                  }}
-                >
-                  Invoices ({paymentHistory.length})
-                </button>
-              </div>
-
-              {/* Payment Methods Tab */}
-              {paymentsTab === 'methods' && (
-                <div className="biz-card">
-                  <h3>{t('cd.payment_methods')||'Accepted Payment Methods in Rwanda'}</h3>
-                  <p style={{color:'var(--biz-text-2)',marginBottom:20}}>We accept multiple payment methods for your subscription:</p>
-                  <div className="biz-payment-methods">
-                    {[
-                      {name:'MTN MoMo', icon:'📱', detail:'Pay via *182# or MTN app'},
-                      {name:'Airtel Money', icon:'📲', detail:'Pay via *185# or Airtel app'},
-                      {name:'Bank Transfer', icon:'🏦', detail:'BPR, BK, KCB, Equity'},
-                      {name:'Visa/Mastercard', icon:'💳', detail:'International cards accepted'},
-                    ].map(p=>(
-                      <div key={p.name} className="biz-payment-item">
-                        <span>{p.icon}</span>
-                        <div>
-                          <strong>{p.name}</strong>
-                          <p>{p.detail}</p>
+                          {ctaEl}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Invoices Tab */}
-              {paymentsTab === 'history' && (
+              {/* ── Invoices Tab ── */}
+              {paymentsTab === 'invoices' && (
                 <div>
                   {paymentHistory.length === 0 ? (
                     <div className="biz-card" style={{textAlign:'center',padding:'40px 24px'}}>
                       <div style={{fontSize:'3rem',marginBottom:16}}>📄</div>
                       <p style={{color:'var(--biz-text-2)',marginBottom:8}}>No invoices yet</p>
-                      <p style={{color:'var(--biz-text-3)',fontSize:'0.9rem'}}>Your invoices and payment history will appear here. Once you upgrade to a paid plan, all transactions will be tracked automatically.</p>
+                      <p style={{color:'var(--biz-text-3)',fontSize:'0.9rem'}}>Your invoices and payment history will appear here once you complete a payment.</p>
                     </div>
                   ) : (
-                    <div style={{display:'grid',gap:16}}>
-                      {paymentHistory.map(payment => (
-                        <div key={payment.id} className="biz-card" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                          <div>
-                            <h4 style={{margin:'0 0 8px 0',color:'var(--biz-text-1)'}}>
-                              {payment.description || `${payment.type} - ${payment.tier}`}
-                            </h4>
-                            <div style={{display:'flex',gap:24,fontSize:'0.85rem',color:'var(--biz-text-3)'}}>
-                              <span>Invoice #{payment.id.slice(0,8).toUpperCase()}</span>
-                              <span>{payment.createdAt?.toDate ? new Date(payment.createdAt.toDate()).toLocaleDateString() : new Date(payment.createdAt?.seconds*1000).toLocaleDateString()}</span>
-                              <span>Status: <strong style={{color:payment.status==='paid'?'#2d8f6f':'#d97706'}}>{payment.status || 'pending'}</strong></span>
-                            </div>
-                          </div>
-                          <div style={{display:'flex',alignItems:'center',gap:12}}>
-                            <div style={{textAlign:'right'}}>
-                              <div style={{fontSize:'1.1rem',fontWeight:700,color:'var(--biz-text-1)'}}>
-                                RWF {payment.price?.toLocaleString() || 'N/A'}
+                    <div style={{display:'grid',gap:12}}>
+                      {paymentHistory.map(tx => {
+                        const planName   = tx.plan || tx.planId || 'Subscription';
+                        const amount     = tx.amount || tx.price || 0;
+                        const currency   = tx.currency || 'RWF';
+                        const method     = tx.method || 'momo';
+                        const rawStatus  = tx.status || 'pending';
+                        const statusLabel = rawStatus === 'paid' || rawStatus === 'successful' ? 'Paid'
+                                          : rawStatus === 'failed' ? 'Failed' : 'Pending';
+                        const statusColor = statusLabel === 'Paid'   ? '#2d8f6f'
+                                          : statusLabel === 'Failed' ? '#dc2626' : '#d97706';
+                        const dateTs  = tx.issuedAt || tx.paidAt || tx.createdAt;
+                        const dateStr = dateTs?.toDate
+                          ? dateTs.toDate().toLocaleDateString('en', {day:'numeric',month:'short',year:'numeric'})
+                          : dateTs?.seconds
+                          ? new Date(dateTs.seconds * 1000).toLocaleDateString('en', {day:'numeric',month:'short',year:'numeric'})
+                          : '—';
+                        const refId = tx.financialTransactionId || tx.referenceId || tx.id;
+                        const methodLabel = method === 'momo' ? '📱 MTN MoMo' : method === 'card' ? '💳 Card' : method;
+
+                        const invoiceText = [
+                          `IREMA INVOICE`,
+                          `══════════════════════════════`,
+                          `Invoice #: ${tx.id.slice(0,12).toUpperCase()}`,
+                          `Date:      ${dateStr}`,
+                          ``,
+                          `Business:  ${tx.businessName || company?.companyName || ''}`,
+                          `Plan:      ${planName.charAt(0).toUpperCase() + planName.slice(1)} Plan`,
+                          `Method:    ${methodLabel}`,
+                          ``,
+                          `Amount:    ${currency} ${Number(amount).toLocaleString()}`,
+                          `Status:    ${statusLabel}`,
+                          refId ? `Ref:       ${refId}` : '',
+                          ``,
+                          `══════════════════════════════`,
+                          `Thank you for using Irema!`,
+                        ].filter(Boolean).join('\n');
+
+                        return (
+                          <div key={tx.id} className="biz-card" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+                            <div style={{minWidth:0,flex:1}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                                <span style={{fontWeight:700,fontSize:'0.95rem',color:'var(--biz-text-1)',textTransform:'capitalize'}}>
+                                  {planName} Plan
+                                </span>
+                                <span style={{fontSize:'0.72rem',fontWeight:700,padding:'2px 10px',borderRadius:99,
+                                  background: statusLabel==='Paid' ? 'rgba(45,143,111,0.1)' : statusLabel==='Failed' ? 'rgba(220,38,38,0.1)' : 'rgba(217,119,6,0.1)',
+                                  color: statusColor}}>
+                                  {statusLabel}
+                                </span>
+                              </div>
+                              <div style={{display:'flex',gap:16,fontSize:'0.8rem',color:'var(--biz-text-3)',flexWrap:'wrap'}}>
+                                <span>#{tx.id.slice(0,8).toUpperCase()}</span>
+                                <span>{dateStr}</span>
+                                <span>{methodLabel}</span>
                               </div>
                             </div>
-                            <div style={{display:'flex',gap:8}}>
+                            <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+                              <div style={{fontSize:'1.1rem',fontWeight:800,color:'var(--biz-text-1)',whiteSpace:'nowrap'}}>
+                                {currency} {Number(amount).toLocaleString()}
+                              </div>
                               <button
                                 onClick={() => {
-                                  const invoice = `INVOICE #${payment.id.slice(0,8).toUpperCase()}\n\nBusiness: ${payment.businessName}\nDate: ${payment.createdAt?.toDate ? new Date(payment.createdAt.toDate()).toLocaleDateString() : new Date(payment.createdAt?.seconds*1000).toLocaleDateString()}\nDescription: ${payment.description}\nAmount: RWF ${payment.price?.toLocaleString()}\nStatus: ${payment.status}`;
-                                  const element = document.createElement('a');
-                                  const file = new Blob([invoice], {type:'text/plain'});
-                                  element.href = URL.createObjectURL(file);
-                                  element.download = `invoice-${payment.id.slice(0,8)}.txt`;
-                                  document.body.appendChild(element);
-                                  element.click();
-                                  document.body.removeChild(element);
+                                  const el = document.createElement('a');
+                                  el.href = URL.createObjectURL(new Blob([invoiceText], {type:'text/plain'}));
+                                  el.download = `irema-invoice-${tx.id.slice(0,8)}.txt`;
+                                  document.body.appendChild(el); el.click(); document.body.removeChild(el);
                                 }}
-                                style={{
-                                  padding:'6px 14px',
-                                  fontSize:'0.85rem',
-                                  border:'1px solid var(--biz-border)',
-                                  background:'var(--biz-bg)',
-                                  borderRadius:6,
-                                  cursor:'pointer',
-                                  fontWeight:600,
-                                  color:'var(--biz-text-1)',
-                                  transition:'all 0.15s'
-                                }}
-                                onMouseEnter={(e) => { e.target.style.background='var(--biz-bg-2)'; }}
-                                onMouseLeave={(e) => { e.target.style.background='var(--biz-bg)'; }}
-                              >
-                                ⬇ Download
-                              </button>
+                                style={{padding:'5px 12px',fontSize:'0.8rem',border:'1px solid var(--biz-border)',background:'var(--biz-bg)',borderRadius:6,cursor:'pointer',fontWeight:600,color:'var(--biz-text-1)'}}
+                              >⬇</button>
                               <button
                                 onClick={() => {
-                                  const invoice = `INVOICE #${payment.id.slice(0,8).toUpperCase()}\n\nBusiness: ${payment.businessName}\nDate: ${payment.createdAt?.toDate ? new Date(payment.createdAt.toDate()).toLocaleDateString() : new Date(payment.createdAt?.seconds*1000).toLocaleDateString()}\nDescription: ${payment.description}\nAmount: RWF ${payment.price?.toLocaleString()}\nStatus: ${payment.status}`;
-                                  const printWindow = window.open('', '', 'height=600,width=800');
-                                  printWindow.document.write('<pre style="font-family:monospace;padding:20px">' + invoice + '</pre>');
-                                  printWindow.document.close();
-                                  printWindow.print();
+                                  const w = window.open('','','height=600,width=600');
+                                  w.document.write(`<pre style="font-family:monospace;padding:24px;font-size:14px">${invoiceText}</pre>`);
+                                  w.document.close(); w.print();
                                 }}
-                                style={{
-                                  padding:'6px 14px',
-                                  fontSize:'0.85rem',
-                                  border:'1px solid var(--biz-border)',
-                                  background:'var(--biz-bg)',
-                                  borderRadius:6,
-                                  cursor:'pointer',
-                                  fontWeight:600,
-                                  color:'var(--biz-text-1)',
-                                  transition:'all 0.15s'
-                                }}
-                                onMouseEnter={(e) => { e.target.style.background='var(--biz-bg-2)'; }}
-                                onMouseLeave={(e) => { e.target.style.background='var(--biz-bg)'; }}
-                              >
-                                🖨 Print
-                              </button>
+                                style={{padding:'5px 12px',fontSize:'0.8rem',border:'1px solid var(--biz-border)',background:'var(--biz-bg)',borderRadius:6,cursor:'pointer',fontWeight:600,color:'var(--biz-text-1)'}}
+                              >🖨</button>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1973,7 +1940,14 @@ export default function CompanyDashboard() {
                       style={{cursor: n.reviewId ? 'pointer' : 'default'}}
                     >
                       <div className="biz-notif-icon">
-                        {n.type==='new_review'?'⭐':n.type==='reply_sent'?'↩️':n.type==='verified'?'✅':'🔔'}
+                        {n.type==='new_review'
+                          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                          : n.type==='reply_sent'
+                          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                          : n.type==='verified'
+                          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        }
                       </div>
                       <div className="biz-notif-body">
                         <p>{n.message||'New notification'}</p>
@@ -2133,6 +2107,31 @@ export default function CompanyDashboard() {
           </div>
         </div>
       )}
+
+      {/* ── Payment Modal ── */}
+      {paymentModal && (
+        <PaymentModal
+          plan={paymentModal.plan}
+          availablePlans={PLANS.filter(p => p.price > 0)}
+          company={company}
+          onSuccess={() => {
+            setPaymentModal(null);
+            // Reload history and switch to invoices tab
+            loadPaymentHistory();
+            setPaymentsTab('invoices');
+            setSection('plans');
+          }}
+          onClose={() => setPaymentModal(null)}
+        />
+      )}
+
+      {/* ── Business bottom nav — mobile + tablet ≤1024px ── */}
+      <BizBottomNav
+        section={section}
+        setSection={setSection}
+        unreadCount={unreadCount}
+        navItems={getNav(t, company, subStatus)}
+      />
     </div>
   );
 }
@@ -2327,7 +2326,6 @@ function BizReviewWidget({ review, onClick, canReply = true }) {
 function ReviewCard({ review, onReply, currentUser }) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
-  const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [showReply, setShowReply] = useState(true); // always open for business efficiency
   const [lightboxImg, setLightboxImg] = useState(null);
@@ -2349,14 +2347,10 @@ function ReviewCard({ review, onReply, currentUser }) {
   const otherReplies = (review.replies||[]).filter(r=>!(r.by==='business'||r.isBusinessReply));
 
   const send = async () => {
-    const validation = validateReplyText(text);
-    if (!validation.ok) {
-      setError(validation.message);
-      return;
-    }
+    if (!text.trim()) return;
     setSending(true);
     await onReply(review.id, text.trim());
-    setText(''); setError(''); setShowReply(false);
+    setText(''); setShowReply(false);
     setSending(false);
   };
 
@@ -2417,7 +2411,7 @@ function ReviewCard({ review, onReply, currentUser }) {
       ))}
       {bizReplies.map((r,i)=>(
         <div key={i} className="biz-reply-item biz-reply-biz">
-          <span className="biz-reply-who">🏢 Business Reply</span>
+          <span className="biz-reply-who">Business Reply</span>
           <p>{r.text||r.content}</p>
           <span className="biz-reply-time">{r.timestamp ? new Date(r.timestamp).toLocaleDateString() : ''}</span>
         </div>
@@ -2428,16 +2422,11 @@ function ReviewCard({ review, onReply, currentUser }) {
         <div className="biz-reply-compose">
           <textarea className="biz-input biz-reply-textarea" rows={3}
             placeholder="Write your response to this customer…"
-            value={text} onChange={e=>{
-              const next = e.target.value;
-              setText(next);
-              setError(next.length > 1000 ? 'Replies can be at most 1000 characters.' : '');
-            }}
+            value={text} onChange={e=>setText(e.target.value)}
             autoFocus/>
-          {error && <div style={{color:'#ef4444',fontSize:'0.78rem',fontWeight:600,marginBottom:8}}>{error}</div>}
           <div className="biz-reply-actions">
             <button className="biz-btn biz-btn-ghost biz-btn-sm" onClick={()=>{setShowReply(false);setText('');}}>{t('cd.cancel')||'Cancel'}</button>
-            <button className="biz-btn biz-btn-primary biz-btn-sm" onClick={send} disabled={sending||!text.trim()||text.length > 1000}>
+            <button className="biz-btn biz-btn-primary biz-btn-sm" onClick={send} disabled={sending||!text.trim()}>
               {sending?'Sending…':'Send Reply'}
             </button>
           </div>

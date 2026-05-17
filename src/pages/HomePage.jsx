@@ -181,7 +181,7 @@ export default function HomePage() {
             </div>
             <div className="hero-trustbar-text" style={{color:'var(--text-4)'}}>|</div>
             <div className="hero-trustbar-text">
-              🏆 Rwanda's #1 Service Review Platform
+              Rwanda's #1 Service Review Platform
             </div>
           </div>
         </div>
@@ -230,7 +230,7 @@ export default function HomePage() {
               ))}
               {topCompanies.length === 0 && (
                 <div style={{gridColumn:'1/-1', textAlign:'center', padding:'60px', color:'var(--text-4)'}}>
-                  <div style={{fontSize:'3rem',marginBottom:'16px'}}>🏢</div>
+                  <div style={{marginBottom:'16px',display:'flex',justifyContent:'center'}}><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" strokeWidth="1.5" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
                   <p>No services yet — be the first to add one!</p>
                   <Link to="/businesses" className="btn btn-primary" style={{marginTop:'16px'}}>Add Your Service</Link>
                 </div>
@@ -356,7 +356,7 @@ export default function HomePage() {
 }
 
 function ReviewGrid({ reviews }) {
-  const [shown, setShown] = React.useState(8);
+  const [shown, setShown] = React.useState(16); // 4 cols × 4 rows
   // Track which review the user wants to open in the detail modal. Clicking a
   // card no longer jumps straight to the business page — it opens this modal,
   // which contains an explicit "go to business" button.
@@ -376,7 +376,7 @@ function ReviewGrid({ reviews }) {
           <button
             className="btn btn-outline"
             style={{padding:'10px 32px', fontSize:'0.9rem', fontWeight:600}}
-            onClick={() => setShown(s => s + 8)}
+            onClick={() => setShown(s => s + 16)}
           >
             Load More Reviews
           </button>
