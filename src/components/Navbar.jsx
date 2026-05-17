@@ -376,11 +376,11 @@ export default function Navbar() {
                   </div>
                   <div className="user-dropdown-divider" />
                   {/* Desktop-only links — hidden on ≤1024px where the PWA bottom nav handles navigation */}
-                  <Link to="/profile" className="user-dropdown-item dropdown-desktop-only" onClick={() => setProfileOpen(false)}>
+                  <Link to="/dashboard" className="user-dropdown-item dropdown-desktop-only" onClick={() => setProfileOpen(false)}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     {t('nav.my_profile') || 'My Profile'}
                   </Link>
-                  <Link to="/my-reviews" className="user-dropdown-item dropdown-desktop-only" onClick={() => setProfileOpen(false)}>
+                  <Link to="/dashboard?tab=reviews" className="user-dropdown-item dropdown-desktop-only" onClick={() => setProfileOpen(false)}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                     {t('nav.my_reviews') || 'My Reviews'}
                   </Link>
