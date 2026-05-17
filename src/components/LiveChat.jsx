@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { db, collection, addDoc, query, where, getDocs, serverTimestamp, updateDoc, doc, functions } from '../firebase/config';
 import { httpsCallable } from 'firebase/functions';
+import './LiveChat.css';
 
 export default function LiveChat() {
   const { user } = useAuthStore();
@@ -124,28 +125,8 @@ export default function LiveChat() {
       {/* Floating Chat Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          width: 64,
-          height: 64,
-          borderRadius: '50%',
-          background: '#2d8f6f',
-          color: 'white',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 8px 24px rgba(45, 143, 111, 0.35)',
-          zIndex: 999,
-          transition: 'all 0.3s ease',
-          transform: isOpen ? 'scale(0.95)' : 'scale(1)',
-        }}
+        className={`livechat-fab${isOpen ? ' livechat-fab-open' : ''}`}
         title="Support Agent - Chat with us!"
-        onMouseEnter={(e) => e.target.style.transform = 'scale(1.08)'}
-        onMouseLeave={(e) => e.target.style.transform = isOpen ? 'scale(0.95)' : 'scale(1)'}
       >
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
           {/* Robot head */}
@@ -167,23 +148,7 @@ export default function LiveChat() {
 
       {/* Chat Panel */}
       {isOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 100,
-            right: 24,
-            width: 360,
-            maxWidth: '90vw',
-            height: 500,
-            borderRadius: 12,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-            display: 'flex',
-            flexDirection: 'column',
-            zIndex: 999
-          }}
-        >
+        <div className="livechat-panel">
           {/* Header */}
           <div
             style={{

@@ -69,18 +69,17 @@ export function getSubscriptionAccess(subscription, now = new Date(), company = 
       : null;
   }
 
-  let analyticsTrialDaysLeft = 0;
-  let isOnAnalyticsTrial = false;
-  if (subscription?.analyticsTrialEndsAt && !isBlocked) {
-    const trialEnds = toDate(subscription.analyticsTrialEndsAt);
-    analyticsTrialDaysLeft = trialEnds
-      ? Math.max(0, Math.ceil((trialEnds - now) / (1000 * 60 * 60 * 24)))
-      : 0;
-    isOnAnalyticsTrial = analyticsTrialDaysLeft > 0;
-  }
+  // Analytics level is now derived purely from the subscription plan.
+  // No separate analyticsAccessLevel field needed on the subscription doc.
+  // starter → free, professional → middle, enterprise → premium
+  const analyticsAccessLevel =
+    effectivePlan === 'enterprise' ? 'premium' :
+    effectivePlan === 'professional' ? 'middle' : 'free';
 
-  const rawAnalyticsLevel = subscription?.analyticsAccessLevel || 'free';
-  const analyticsAccessLevel = isBlocked ? 'free' : rawAnalyticsLevel;
+  // Legacy fields — kept as constants so old call-sites don't break,
+  // but trial is now just the standard plan trial (isTrial / trialDaysLeft).
+  const isOnAnalyticsTrial = false;
+  const analyticsTrialDaysLeft = 0;
 
   const planFeatureMap = {
     reply_reviews: rank >= 1,

@@ -14,6 +14,7 @@ import EmailVerificationGate from './components/EmailVerificationGate';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
 import LiveChat from './components/LiveChat';
 import EnvBanner from './components/EnvBanner';
+import PWABottomNav from './components/PWABottomNav';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const SearchResults = lazy(() => import('./pages/SearchResults'));
@@ -54,6 +55,9 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const AuthActionPage = lazy(() => import('./pages/AuthActionPage'));
+const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const AllReviewsPage = lazy(() => import('./pages/AllReviewsPage'));
 
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, loading } = useAuthStore();
@@ -133,6 +137,7 @@ export default function App() {
           <Route path="/businesses" element={<BusinessesPage />} />
           <Route path="/top-rated" element={<PublicLayout><TopRatedPage /></PublicLayout>} />
           <Route path="/scan" element={<PublicLayout><QRScanPage /></PublicLayout>} />
+          <Route path="/reviews" element={<PublicLayout><AllReviewsPage /></PublicLayout>} />
           <Route path="/blog" element={<PublicLayout><BlogPage /></PublicLayout>} />
           <Route path="/newsletter" element={<PublicLayout><NewsletterPage /></PublicLayout>} />
           <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
@@ -141,6 +146,12 @@ export default function App() {
           {/* Protected user routes */}
           <Route path="/dashboard" element={
             <ProtectedRoute><PublicLayout><UserDashboard /></PublicLayout></ProtectedRoute>
+          } />
+          <Route path="/my-reviews" element={
+            <ProtectedRoute><PublicLayout><MyReviewsPage /></PublicLayout></ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute><PublicLayout><ProfilePage /></PublicLayout></ProtectedRoute>
           } />
           <Route path="/company-dashboard" element={<EmailVerificationGate><SubscriptionGuard><CompanyDashboard /></SubscriptionGuard></EmailVerificationGate>} />
 
@@ -175,6 +186,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      <PWABottomNav />
       <LiveChat />
       <EnvBanner />
     </BrowserRouter>
