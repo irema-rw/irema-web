@@ -76,8 +76,8 @@ export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const [changePwOpen, setChangePwOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const profileRef = useRef(null);
   const langRef = useRef(null);
 
@@ -377,21 +377,20 @@ export default function Navbar() {
                     </div>
                   </div>
                   <div className="user-dropdown-divider" />
-                  {/* Route user vs business correctly */}
-                  {userProfile?.role === 'company_admin' ? (
-                    <Link to="/company-dashboard" className="user-dropdown-item" onClick={() => setProfileOpen(false)}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                      {t('nav.business_dashboard') || 'Business Dashboard'}
-                    </Link>
-                  ) : (
+                  {/* Desktop-only links — hidden on ≤1024px where the PWA bottom nav handles navigation */}
+                  <Link to="/profile" className="user-dropdown-item dropdown-desktop-only" onClick={() => setProfileOpen(false)}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    {t('nav.my_profile') || 'My Profile'}
+                  </Link>
+                  <Link to="/my-reviews" className="user-dropdown-item dropdown-desktop-only" onClick={() => setProfileOpen(false)}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    {t('nav.my_reviews') || 'My Reviews'}
+                  </Link>
+                  {userProfile?.role === 'company_admin' && (
                     <>
-                      <Link to="/dashboard" className="user-dropdown-item" onClick={() => setProfileOpen(false)}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        {t('nav.my_profile') || 'My Profile'}
-                      </Link>
-                      <Link to="/dashboard?tab=reviews" className="user-dropdown-item" onClick={() => setProfileOpen(false)}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                        {t('nav.my_reviews')}
+                      <Link to="/company-dashboard" className="user-dropdown-item dropdown-desktop-only" onClick={() => setProfileOpen(false)}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                        {t('nav.business_dashboard') || 'Business Dashboard'}
                       </Link>
                     </>
                   )}
@@ -409,66 +408,15 @@ export default function Navbar() {
               )}
             </div>
           ) : (
-            <div className="auth-btns hidden-mobile">
-              <button className="btn btn-ghost btn-sm" onClick={() => openModal('login')}>{t('nav.login')}</button>
-              <button className="btn btn-primary btn-sm" onClick={() => openModal('signup')}>{t('nav.signup')}</button>
+            <div className="auth-btns">
+              <button className="nav-auth-login" onClick={() => openModal('login')}>{t('nav.login')}</button>
+              <button className="nav-auth-signup" onClick={() => openModal('signup')}>{t('nav.signup')}</button>
             </div>
           )}
 
-          {/* Hamburger */}
-          <button className="mobile-menu-btn" aria-label="Toggle menu" onClick={() => setMobileOpen(v => !v)}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              {mobileOpen
-                ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
-                : <><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>
-              }
-            </svg>
-          </button>
         </div>
       </div>
-
-      {/* Mobile drawer — rendered via portal to escape backdrop-filter stacking context */}
-      {mobileOpen && typeof document !== 'undefined' && ReactDOM.createPortal(
-        <div className="mobile-menu" role="navigation" aria-label="Mobile navigation"
-          style={{position:'fixed',top:68,left:0,right:0,bottom:0,
-            background:'var(--surface)',zIndex:9990,overflowY:'auto',
-            display:'flex',flexDirection:'column',
-            borderTop:'1px solid var(--border)',
-            animation:'slideDown 0.2s ease'}}>
-          <button className="mobile-menu-item" onClick={() => { openModal('writeReview'); setMobileOpen(false); }}>
-            ✍️ {t('nav.write_review')}
-          </button>
-          <Link to="/businesses" className="mobile-menu-item" onClick={() => setMobileOpen(false)}>{t('nav.for_businesses')}</Link>
-          <Link to="/top-rated" className="mobile-menu-item" onClick={() => setMobileOpen(false)}>⭐ {t('nav.top_rated')}</Link>
-          <Link to="/scan" className="mobile-menu-item" onClick={() => setMobileOpen(false)}>📷 {t('nav.scan_qr')}</Link>
-          <div className="mobile-menu-divider" />
-          {!user ? (
-            <>
-              <button className="mobile-menu-item" style={{fontSize:'1rem',fontWeight:600,color:'var(--text-1)'}}
-                onClick={() => { openModal('login'); setMobileOpen(false); }}>
-                🔑 {t('nav.login')}
-              </button>
-              <button className="mobile-menu-item" style={{fontSize:'1rem',fontWeight:700,color:'white',background:'var(--brand)',margin:'8px 16px',borderRadius:10,padding:'14px 20px',width:'calc(100% - 32px)'}}
-                onClick={() => { openModal('signup'); setMobileOpen(false); }}>
-                ✨ {t('nav.signup')} — Free
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/dashboard" className="mobile-menu-item" onClick={() => setMobileOpen(false)}>
-                👤 {t('nav.my_profile')}
-              </Link>
-              <Link to="/dashboard?tab=reviews" className="mobile-menu-item" onClick={() => setMobileOpen(false)}>
-                ⭐ {t('nav.my_reviews')}
-              </Link>
-              <button className="mobile-menu-item" style={{color:'var(--danger)'}} onClick={() => { handleLogout(); setMobileOpen(false); }}>
-                🚪 {t('nav.logout')}
-              </button>
-            </>
-          )}
-        </div>,
-        document.body
-      )}
+      {/* Hamburger removed — bottom nav covers all primary routes on mobile */}
     </nav>
     {changePwOpen && <ChangePasswordModal onClose={() => setChangePwOpen(false)} />}
     </>
