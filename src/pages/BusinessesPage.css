@@ -118,6 +118,7 @@
 .bp-price-card ul { list-style: none; display: flex; flex-direction: column; gap: 8px; flex: 1; margin-bottom: 20px; }
 .bp-price-card li { display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; color: #2e3d38; }
 .bp-price-card li span { color: var(--green); font-weight: 700; flex-shrink: 0; }
+.bp-price-analytics-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green); margin: 6px 0 2px; opacity: 0.85; }
 .bp-pricing-note { text-align: center; margin-top: 24px; font-size: 0.82rem; color: var(--text-3); }
 
 /* ── CTA section ── */

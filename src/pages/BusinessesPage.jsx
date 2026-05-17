@@ -645,9 +645,85 @@ export default function BusinessesPage() {
           <h2>{t('biz.plans_fit')}</h2>
           <div className="bp-pricing-grid">
             {[
-              {nameKey:'plan_starter', price:'Free', subKey:'plan_starter_sub', features:['1 listing','Basic analytics','Email support','Community badge'], ctaKey:'start_free_plan', primary:false, isEnt:false},
-              {nameKey:'plan_pro', price:'25,000 RWF', subKey:'plan_pro_sub', features:['Unlimited reviews','Advanced analytics','Reply management','Competitor insights','Verified badge','QR codes'], ctaKey:'start_trial', primary:true, isEnt:false},
-              {nameKey:'plan_ent', price:'75,000 RWF', subKey:'plan_ent_sub', features:['Up to 5 listings','AI sentiment','Dedicated manager','API access','White-label widgets'], ctaKey:'contact_sales', primary:false, isEnt:true},
+              {
+                nameKey:'plan_starter',
+                price:'Free',
+                subKey:'plan_starter_sub',
+                features:[
+                  '1 business listing',
+                  'Unlimited reviews from customers',
+                  'Respond to up to 50 reviews',
+                  'Email notifications',
+                  'Community badge',
+                  '14-day free trial on signup',
+                ],
+                analyticsFeatures:[
+                  'Avg Rating',
+                  'Total Reviews',
+                  'Response Rate',
+                  'Top Complaint',
+                  'Rating Distribution',
+                  'Review Count This Month',
+                ],
+                ctaKey:'start_free_plan',
+                primary:false,
+                isEnt:false
+              },
+              {
+                nameKey:'plan_pro',
+                price:'25,000 RWF',
+                subKey:'plan_pro_sub',
+                features:[
+                  '1 business listing',
+                  'Unlimited reviews',
+                  'Unlimited responses to reviews',
+                  'Verified badge',
+                  'QR code downloads',
+                  'Priority support',
+                  'Competitor insights',
+                ],
+                analyticsFeatures:[
+                  'Everything in Starter analytics',
+                  'Sentiment score & analysis',
+                  'Positive / Negative % breakdown',
+                  'Competitor benchmarking & rank',
+                  'Trend forecasting & growth rate',
+                  'Price perception score',
+                  'Product Quality Score',
+                  'Review velocity',
+                  'Top praised & complaint themes',
+                ],
+                ctaKey:'start_trial',
+                primary:true,
+                isEnt:false
+              },
+              {
+                nameKey:'plan_ent',
+                price:'75,000 RWF',
+                subKey:'plan_ent_sub',
+                features:[
+                  'Up to 5 business listings',
+                  'Unlimited everything',
+                  'Unlimited responses',
+                  'AI sentiment analysis',
+                  'Dedicated account manager',
+                  'Custom integrations',
+                  'White-label widgets',
+                  'API access',
+                  'SLA support',
+                  'Product listings on your page',
+                ],
+                analyticsFeatures:[
+                  'Everything in Professional analytics',
+                  'AI-powered recommendations',
+                  'Revenue forecasting',
+                  'Executive reports',
+                  'Full premium metrics dashboard',
+                ],
+                ctaKey:'contact_sales',
+                primary:false,
+                isEnt:true
+              },
             ].map(plan=>(
               <div key={plan.nameKey} className={`bp-price-card${plan.primary?' bp-price-highlight':''}`}>
                 {plan.primary && <div className="bp-price-pop">{t('biz.most_popular')}</div>}
@@ -657,6 +733,14 @@ export default function BusinessesPage() {
                 <ul>
                   {plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}
                 </ul>
+                {plan.analyticsFeatures?.length > 0 && (
+                  <>
+                    <div className="bp-price-analytics-label">📊 Analytics Included</div>
+                    <ul>
+                      {plan.analyticsFeatures.map(f=><li key={f}><span>✓</span>{f}</li>)}
+                    </ul>
+                  </>
+                )}
                 <button className={plan.primary?'bp-btn-primary':'bp-btn-outline'}
                   onClick={()=>plan.isEnt ? window.open('mailto:business@irema.rw','_blank') : setModal('register')}>
                   {t(`biz.${plan.ctaKey}`)}
