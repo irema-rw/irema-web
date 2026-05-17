@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   db, auth, storage,
   collection, query, where, getDocs, doc, deleteDoc, updateDoc, arrayUnion,
   storageRef, uploadBytes, getDownloadURL,
 } from '../firebase/config';
-import { updateProfile } from 'firebase/auth';
+import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
 import { useModalStore } from '../store/modalStore';
 import StarRating from '../components/StarRating';
@@ -164,20 +164,28 @@ export default function UserDashboard() {
   const { t, i18n } = useTranslation();
   const { user, userProfile } = useAuthStore();
   const { openModal } = useModalStore();
+  const navigate = useNavigate();
   const [photoUploading, setPhotoUploading] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [reviewModal, setReviewModal] = useState(null); // review to show in modal
+  const [reviewModal, setReviewModal] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState(null);
   const [searchParams] = useSearchParams();
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editName, setEditName] = useState('');
-  const [myReports, setMyReports] = useState([]);
-  const [reportsLoading, setReportsLoading] = useState(true);
-  const [myClaims, setMyClaims] = useState([]);
-  const [claimsLoading, setClaimsLoading] = useState(true);
+  // Tab routing
+  const activeTab = searchParams.get('tab') || 'reviews';
+  // Change password
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwErr, setPwErr] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [showCurPw, setShowCurPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConPw, setShowConPw] = useState(false);
+  const isGoogleUser = user?.providerData?.[0]?.providerId === 'google.com';
 
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
@@ -192,35 +200,29 @@ export default function UserDashboard() {
     } catch(e) { showToast('Update failed: ' + e.message, 'error'); }
   }
 
-  useEffect(() => { if (user) { loadReviews(); loadMyReports(); loadMyClaims(); } }, [user]);
-
-  async function loadMyClaims() {
-    setClaimsLoading(true);
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    setPwErr(''); setPwSuccess(''); setPwLoading(true);
+    const { current, next, confirm } = pwForm;
+    if (next !== confirm) { setPwErr('New passwords do not match.'); setPwLoading(false); return; }
+    if (next.length < 6) { setPwErr('Password must be at least 6 characters.'); setPwLoading(false); return; }
     try {
-      const snap = await getDocs(query(
-        collection(db, 'claims'),
-        where('claimantUserId', '==', user.uid)
-      ));
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      setMyClaims(data);
-    } catch(e) { console.error(e); }
-    setClaimsLoading(false);
+      const credential = EmailAuthProvider.credential(user.email, current);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, next);
+      setPwSuccess('Password updated successfully!');
+      setPwForm({ current: '', next: '', confirm: '' });
+    } catch(err) {
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setPwErr('Current password is incorrect.');
+      } else {
+        setPwErr(err.message || 'Failed to update password.');
+      }
+    }
+    setPwLoading(false);
   }
 
-  async function loadMyReports() {
-    setReportsLoading(true);
-    try {
-      const snap = await getDocs(query(
-        collection(db, 'reports'),
-        where('reportedBy', '==', user.uid)
-      ));
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      setMyReports(data);
-    } catch(e) { console.error(e); }
-    setReportsLoading(false);
-  }
+  useEffect(() => { if (user) loadReviews(); }, [user]);
 
   async function loadReviews() {
     setLoading(true);
@@ -347,7 +349,7 @@ export default function UserDashboard() {
                 : <div className="ud-avatar-large">{initials}</div>
               }
               <label className="ud-photo-upload-btn" title="Click to add/change profile photo">
-                {photoUploading ? '⏳' : '+'}
+                {photoUploading ? '…' : '+'}
                 <input type="file" accept="image/*" style={{ display:'none' }} onChange={handlePhotoUpload} />
               </label>
             </div>
@@ -370,7 +372,7 @@ export default function UserDashboard() {
                     <div className="ud-stat-divider" />
                     <div className="ud-hero-stat">
                       <div className="ud-hero-stat-num">
-                        {(reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1)}⭐
+                        {(reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1)}
                       </div>
                       <div className="ud-hero-stat-label">{t('profile.avg_given') || 'Avg Given'}</div>
                     </div>
@@ -380,215 +382,164 @@ export default function UserDashboard() {
             </div>
             <div className="ud-hero-actions" style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
               <button className="btn btn-outline-white" onClick={() => openModal('writeReview')}>
-                ✍️ {t('review.write') || 'Write a Review'}
+                {t('review.write') || 'Write a Review'}
               </button>
               <button className="btn" style={{background:'rgba(255,255,255,0.15)',color:'white',border:'1px solid rgba(255,255,255,0.3)',fontSize:'0.82rem',padding:'6px 14px'}}
                 onClick={() => { setEditName(displayName); setEditProfileOpen(true); }}>
-                ✏️ {t('profile.edit_profile') || 'Edit Profile'}
+                {t('profile.edit_profile') || 'Edit Profile'}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container">
-        <div className="ud-section-header">
-          <div>
-            <h2 className="ud-section-title">
-              {t('profile.reviews_tab') || 'My Reviews'}
-              <span className="ud-section-count">{reviews.length}</span>
-            </h2>
-            <p className="ud-section-sub">
-              {t('profile.click_review_desc') || 'Click any review to see full details and reply to business responses.'}
-            </p>
-          </div>
-        </div>
-
-        {loading ? (
-          <LoadingSpinner />
-        ) : companyList.length === 0 ? (
-          <div className="ud-empty card">
-            <div className="ud-empty-icon">⭐</div>
-            <h3>{t('profile.no_reviews_yet') || 'No reviews yet'}</h3>
-            <p>{t('profile.no_reviews_desc') || 'Share your experience with businesses you have visited across Rwanda.'}</p>
-            <button className="btn btn-primary" onClick={() => openModal('writeReview')}>
-              {t('review.write') || 'Write a Review'}
+      {/* ── Tab Bar ── */}
+      <div className="ud-tab-bar">
+        <div className="container">
+          <div className="ud-tabs">
+            <button
+              className={`ud-tab${activeTab === 'reviews' ? ' ud-tab-active' : ''}`}
+              onClick={() => navigate('/dashboard?tab=reviews')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              My Reviews
+              {reviews.length > 0 && <span className="ud-tab-count">{reviews.length}</span>}
+            </button>
+            <button
+              className={`ud-tab${activeTab === 'profile' ? ' ud-tab-active' : ''}`}
+              onClick={() => navigate('/dashboard?tab=profile')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+              Profile
             </button>
           </div>
-        ) : (
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:16}}>
-            {reviews.slice().sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).map(rev => (
-              <UserReviewCard
-                key={rev.id}
-                rev={rev}
-                cid={rev.companyId}
-                onDelete={id => setDeleteConfirm(id)}
-                onOpenModal={setReviewModal}
-                currentUser={user}
-                t={t}
-                i18n={i18n}
-              />
-            ))}
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* ── My Claims ── */}
-      <div className="container" style={{ marginTop: 40 }}>
-        <div className="ud-section-header">
-          <div>
-            <h2 className="ud-section-title">
-              My Business Claims
-              <span className="ud-section-count">{myClaims.length}</span>
-            </h2>
-            <p className="ud-section-sub">Track the status of your business ownership claims.</p>
+      {/* ── My Reviews Tab ── */}
+      {activeTab === 'reviews' && (
+        <div className="container">
+          <div className="ud-section-header">
+            <div>
+              <h2 className="ud-section-title">
+                {t('profile.reviews_tab') || 'My Reviews'}
+                <span className="ud-section-count">{reviews.length}</span>
+              </h2>
+              <p className="ud-section-sub">
+                {t('profile.click_review_desc') || 'Click any review to see full details and reply to business responses.'}
+              </p>
+            </div>
+          </div>
+
+          {loading ? (
+            <LoadingSpinner />
+          ) : companyList.length === 0 ? (
+            <div className="ud-empty card">
+              <div className="ud-empty-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" strokeWidth="1.5" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <h3>{t('profile.no_reviews_yet') || 'No reviews yet'}</h3>
+              <p>{t('profile.no_reviews_desc') || 'Share your experience with businesses you have visited across Rwanda.'}</p>
+              <button className="btn btn-primary" onClick={() => openModal('writeReview')}>
+                {t('review.write') || 'Write a Review'}
+              </button>
+            </div>
+          ) : (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:16}}>
+              {reviews.slice().sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).map(rev => (
+                <UserReviewCard
+                  key={rev.id}
+                  rev={rev}
+                  cid={rev.companyId}
+                  onDelete={id => setDeleteConfirm(id)}
+                  onOpenModal={setReviewModal}
+                  currentUser={user}
+                  t={t}
+                  i18n={i18n}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Profile Tab ── */}
+      {activeTab === 'profile' && (
+        <div className="container">
+          <div className="ud-profile-grid">
+
+            {/* Account info card */}
+            <div className="ud-profile-card">
+              <h3 className="ud-profile-card-title">Account Information</h3>
+              <div className="ud-profile-info-row">
+                <span className="ud-profile-info-label">Display name</span>
+                <span className="ud-profile-info-val">{user?.displayName || '—'}</span>
+              </div>
+              <div className="ud-profile-info-row">
+                <span className="ud-profile-info-label">Email</span>
+                <span className="ud-profile-info-val">{user?.email}</span>
+              </div>
+              {memberSince && (
+                <div className="ud-profile-info-row">
+                  <span className="ud-profile-info-label">Member since</span>
+                  <span className="ud-profile-info-val">{memberSince}</span>
+                </div>
+              )}
+              <div style={{marginTop:20,display:'flex',gap:10,flexWrap:'wrap'}}>
+                <button className="btn btn-outline" style={{fontSize:'0.84rem',padding:'8px 18px'}}
+                  onClick={() => { setEditName(user?.displayName || ''); setEditProfileOpen(true); }}>
+                  Edit Name
+                </button>
+                <label className="btn btn-outline" style={{fontSize:'0.84rem',padding:'8px 18px',cursor:'pointer'}}>
+                  {photoUploading ? 'Uploading…' : 'Change Photo'}
+                  <input type="file" accept="image/*" style={{display:'none'}} onChange={handlePhotoUpload} />
+                </label>
+              </div>
+            </div>
+
+            {/* Change password card — hidden for Google users */}
+            {!isGoogleUser && (
+              <div className="ud-profile-card">
+                <h3 className="ud-profile-card-title">Change Password</h3>
+                <form onSubmit={handleChangePassword}>
+                  {pwErr && <div className="ud-pw-error">{pwErr}</div>}
+                  {pwSuccess && <div className="ud-pw-success">{pwSuccess}</div>}
+                  {[
+                    { label: 'Current password', key: 'current', show: showCurPw, toggle: setShowCurPw },
+                    { label: 'New password', key: 'next', show: showNewPw, toggle: setShowNewPw },
+                    { label: 'Confirm new password', key: 'confirm', show: showConPw, toggle: setShowConPw },
+                  ].map(({ label, key, show, toggle }) => (
+                    <div key={key} style={{position:'relative',marginBottom:12}}>
+                      <label style={{display:'block',fontSize:'0.8rem',fontWeight:600,color:'var(--text-3)',marginBottom:5}}>{label}</label>
+                      <input
+                        className="ud-pw-input"
+                        type={show ? 'text' : 'password'}
+                        value={pwForm[key]}
+                        onChange={e => setPwForm(p => ({...p, [key]: e.target.value}))}
+                        required
+                        minLength={key !== 'current' ? 6 : undefined}
+                        style={{paddingRight:40}}
+                      />
+                      <button type="button" onClick={() => toggle(v => !v)}
+                        style={{position:'absolute',bottom:10,right:10,background:'none',border:'none',cursor:'pointer',color:'var(--text-3)',display:'flex',alignItems:'center',padding:0}}>
+                        {show
+                          ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                          : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        }
+                      </button>
+                    </div>
+                  ))}
+                  <button className="btn btn-primary" type="submit" disabled={pwLoading}
+                    style={{width:'100%',marginTop:4}}>
+                    {pwLoading ? 'Updating…' : 'Update Password'}
+                  </button>
+                </form>
+              </div>
+            )}
+
           </div>
         </div>
-
-        {claimsLoading ? (
-          <LoadingSpinner />
-        ) : myClaims.length === 0 ? (
-          <div className="ud-empty card">
-            <div className="ud-empty-icon">🏢</div>
-            <h3>No claims submitted</h3>
-            <p>Visit the <a href="/businesses" style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}>Businesses page</a> to claim ownership of your business.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {myClaims.map(claim => {
-              const statusConfig = claim.status === 'approved'
-                ? { bg: '#f0faf6', text: '#1f6b52', border: '#bbf7d0', label: 'Approved' }
-                : claim.status === 'rejected'
-                ? { bg: '#fef2f2', text: '#dc2626', border: '#fecaca', label: 'Not Approved' }
-                : { bg: '#fffbeb', text: '#92400e', border: '#fde68a', label: 'Pending Review' };
-              const createdAt = claim.createdAt?.toDate
-                ? claim.createdAt.toDate()
-                : claim.createdAt?.seconds
-                ? new Date(claim.createdAt.seconds * 1000)
-                : null;
-
-              return (
-                <div key={claim.id} style={{
-                  background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 12, padding: '14px 16px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-1)', marginBottom: 4 }}>
-                      {claim.businessName || claim.companyName || '—'}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>
-                      {claim.claimantRole && <span style={{ marginRight: 10 }}>Role: <strong style={{ color: 'var(--text-2)' }}>{claim.claimantRole}</strong></span>}
-                      {createdAt && <span>Submitted {createdAt.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
-                    </div>
-                    {claim.status === 'pending' && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-4)', marginTop: 4 }}>
-                        Our team typically reviews claims within 24 hours.
-                      </div>
-                    )}
-                    {claim.status === 'approved' && (
-                      <a href="/company-dashboard" style={{ fontSize: '0.78rem', color: 'var(--brand)', fontWeight: 600, textDecoration: 'none', marginTop: 4, display: 'inline-block' }}>
-                        Go to your dashboard →
-                      </a>
-                    )}
-                  </div>
-                  <span style={{
-                    flexShrink: 0, padding: '4px 12px', borderRadius: 99,
-                    fontSize: '0.75rem', fontWeight: 700,
-                    background: statusConfig.bg, color: statusConfig.text, border: `1px solid ${statusConfig.border}`,
-                  }}>
-                    {statusConfig.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── My Reports ── */}
-      <div className="container" style={{ marginTop: 40 }}>
-        <div className="ud-section-header">
-          <div>
-            <h2 className="ud-section-title">
-              My Reports
-              <span className="ud-section-count">{myReports.length}</span>
-            </h2>
-            <p className="ud-section-sub">Reviews you have flagged for our moderation team.</p>
-          </div>
-        </div>
-
-        {reportsLoading ? (
-          <LoadingSpinner />
-        ) : myReports.length === 0 ? (
-          <div className="ud-empty card">
-            <div className="ud-empty-icon">🏳️</div>
-            <h3>No reports submitted</h3>
-            <p>You haven't flagged any reviews yet. Use the flag icon on a review to report it.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {myReports.map(report => {
-              const statusColor = report.status === 'resolved'
-                ? { bg: '#f0faf6', text: '#1f6b52', border: '#bbf7d0' }
-                : report.status === 'dismissed'
-                ? { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' }
-                : { bg: '#fffbeb', text: '#92400e', border: '#fde68a' };
-              const createdAt = report.createdAt?.toDate
-                ? report.createdAt.toDate()
-                : report.createdAt?.seconds
-                ? new Date(report.createdAt.seconds * 1000)
-                : null;
-
-              return (
-                <div key={report.id} style={{
-                  background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 12, padding: '14px 16px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {/* Business name */}
-                      {report.companyName && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginBottom: 4 }}>
-                          📍 {report.companyName}
-                        </div>
-                      )}
-                      {/* Review snippet */}
-                      <p style={{
-                        margin: '0 0 8px', fontSize: '0.85rem', color: 'var(--text-2)',
-                        lineHeight: 1.5, fontStyle: 'italic',
-                        borderLeft: '3px solid var(--border)', paddingLeft: 10,
-                      }}>
-                        "{report.reviewSnippet || '—'}"
-                      </p>
-                      {/* Reason */}
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>
-                        <strong style={{ color: 'var(--text-2)' }}>Reason:</strong> {report.reason}
-                        {report.comment && (
-                          <span style={{ marginLeft: 6, color: 'var(--text-4)' }}>· "{report.comment}"</span>
-                        )}
-                      </div>
-                      {createdAt && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-4)', marginTop: 4 }}>
-                          Reported on {createdAt.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </div>
-                      )}
-                    </div>
-                    {/* Status badge */}
-                    <span style={{
-                      flexShrink: 0, padding: '3px 10px', borderRadius: 99,
-                      fontSize: '0.75rem', fontWeight: 700, textTransform: 'capitalize',
-                      background: statusColor.bg, color: statusColor.text, border: `1px solid ${statusColor.border}`,
-                    }}>
-                      {report.status || 'pending'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Review Detail Modal — using shared ReviewModal component */}
       {reviewModal && (
@@ -632,7 +583,7 @@ export default function UserDashboard() {
               />
             </div>
             <div style={{fontSize:'0.8rem',color:'var(--text-4)',marginBottom:16}}>
-              {t('profile.photo_hint') || '📷 To change your profile photo, click the camera icon on your avatar.'}
+              {t('profile.photo_hint') || 'To change your profile photo, click the + icon on your avatar above.'}
             </div>
             <div className="ud-confirm-actions">
               <button className="btn btn-ghost" onClick={() => setEditProfileOpen(false)}>Cancel</button>
