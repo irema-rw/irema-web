@@ -56,31 +56,28 @@
 }
 .stories-strip {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   overflow-x: auto;
   overflow-y: visible;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
-  padding: 20px 0 20px 0;
+  padding: 20px 0;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y pinch-zoom; /* allow both horizontal and vertical touch scrolling */
+  touch-action: pan-x pan-y pinch-zoom;
   align-items: flex-end;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 .stories-strip::-webkit-scrollbar { display: none; }
 
-.stories-strip::-webkit-scrollbar { height: 4px; }
-.stories-strip::-webkit-scrollbar-track { background: var(--bg-2, #f3f4f6); border-radius: 2px; }
-.stories-strip::-webkit-scrollbar-thumb { background: var(--brand); border-radius: 2px; }
-
-/* ── Story card — tall portrait like paygap.asia ── */
+/* ── Story card — 4 per row on desktop, fluid ── */
 .story-card {
   flex-shrink: 0;
-  width: 290px;
-  height: 510px;
+  /* 4 cards + 3 gaps of 16px each */
+  width: calc((100%) / 4 - 12px);
+  height: 480px;
   border-radius: 20px;
-  overflow: hidden; /* keep video inside card - this is correct */
+  overflow: hidden;
   position: relative;
   cursor: pointer;
   scroll-snap-align: start;
@@ -89,14 +86,14 @@
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
 .story-card:hover {
-  transform: translateY(-12px) scale(1.03);
+  transform: translateY(-10px) scale(1.02);
   box-shadow: 0 20px 48px rgba(0,0,0,0.28);
 }
 .story-card-active {
-  width: 320px;
-  height: 560px;
+  width: calc((100%) / 4 - 12px);
+  height: 520px;
   box-shadow: 0 24px 64px rgba(0,0,0,0.38);
-  transform: translateY(-24px) scale(1.04);
+  transform: translateY(-20px) scale(1.03);
   z-index: 2;
 }
 
@@ -240,14 +237,36 @@
 .story-file-drop:hover { border-color: var(--brand); }
 .story-file-drop input { display: none; }
 
+/* Tablet — 2 cards visible */
+@media (max-width: 1024px) {
+  .story-card,
+  .story-card-active {
+    width: calc(50% - 8px);
+    height: 400px;
+  }
+  .story-card-active { height: 440px; }
+}
+
+/* Large mobile — 1.5 cards visible (half of next card peeks) */
 @media (max-width: 768px) {
-  .story-card { width: 185px; height: 330px; }
-  .story-card-active { width: 220px; height: 390px; }
+  .story-card,
+  .story-card-active {
+    width: calc(66.666% - 8px);
+    height: 340px;
+  }
+  .story-card-active { height: 375px; }
   .stories-scroll-wrap { padding: 24px 16px 36px; }
   .stories-header { padding: 0 16px; }
 }
+
+/* Small mobile — nearly full width, next card peeks */
 @media (max-width: 480px) {
-  .story-card { width: 155px; height: 275px; }
+  .story-card,
+  .story-card-active {
+    width: calc(85% - 8px);
+    height: 300px;
+  }
+  .story-card-active { height: 330px; }
   .story-upload-grid { grid-template-columns: 1fr; }
   .stories-scroll-wrap { padding: 24px 12px 36px; }
   .stories-header { padding: 0 12px; }
