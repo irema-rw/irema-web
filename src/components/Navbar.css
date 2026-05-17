@@ -163,6 +163,12 @@
 .user-dropdown-name { font-weight: 700; font-size: 0.875rem; color: var(--text-1); padding: 4px var(--sp-2); }
 .user-dropdown-email { font-size: 0.78rem; color: var(--text-4); padding: 0 var(--sp-2) 8px; }
 .user-dropdown-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+/* Desktop-only dropdown items — hidden at ≤1024px where PWA bottom nav handles navigation */
+.dropdown-desktop-only { display: flex; }
+@media (max-width: 1024px) {
+  .dropdown-desktop-only { display: none !important; }
+}
 .user-dropdown-item {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 8px var(--sp-2); border-radius: var(--r-sm); font-size: 0.86rem;
@@ -263,42 +269,85 @@
 
 
 /* ═══════════════════════════════════════════════════════════
-   NAVBAR — COMPREHENSIVE ALL-SCREEN RESPONSIVE (v36)
-   Breakpoints: 1200px / 900px / 768px / 640px / 480px / 360px
+   AUTH BUTTONS — pill style, always visible on all screens
    ═══════════════════════════════════════════════════════════ */
 
-/* Desktop XL (1200px+) — full everything */
-.hidden-mobile { display: flex; }
-.auth-btns { display: flex; align-items: center; gap: 8px; }
-.mobile-menu-btn { display: none; }
+.auth-btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
-/* Desktop compact (900–1200px) */
+/* Login — ghost pill */
+.nav-auth-login {
+  display: flex; align-items: center;
+  padding: 7px 18px; border-radius: 99px;
+  font-size: 0.84rem; font-weight: 600; font-family: var(--font-body);
+  color: var(--text-1); background: transparent;
+  border: 1.5px solid var(--border);
+  cursor: pointer; white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  line-height: 1;
+}
+.nav-auth-login:hover {
+  border-color: var(--brand); color: var(--brand);
+  background: var(--brand-xlight);
+}
+
+/* Sign Up — solid brand pill */
+.nav-auth-signup {
+  display: flex; align-items: center;
+  padding: 7px 18px; border-radius: 99px;
+  font-size: 0.84rem; font-weight: 700; font-family: var(--font-body);
+  color: white; background: var(--brand); border: none;
+  cursor: pointer; white-space: nowrap;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+  box-shadow: 0 2px 10px rgba(30,202,184,0.28);
+  line-height: 1;
+}
+.nav-auth-signup:hover {
+  background: var(--brand-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(30,202,184,0.38);
+}
+
+/* Dark mode */
+[data-theme="dark"] .nav-auth-login { color: var(--text-2); border-color: var(--border); }
+[data-theme="dark"] .nav-auth-login:hover { color: var(--brand); border-color: var(--brand); background: rgba(30,202,184,0.1); }
+[data-theme="dark"] .nav-auth-signup { background: var(--brand); color: white; }
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE — all screen sizes
+   Breakpoints: 1200 / 900 / 768 / 640 / 480 / 360
+   ═══════════════════════════════════════════════════════════ */
+
+.hidden-mobile { display: flex; }
+.mobile-menu-btn { display: none !important; } /* removed — bottom nav replaces hamburger */
+
+/* 900–1200px */
 @media (max-width: 1200px) {
   .navbar-inner { padding: 0 20px; }
   .navbar-search { max-width: 280px; }
 }
 
-/* Tablet landscape (768–900px) */
+/* 768–900px */
 @media (max-width: 900px) {
   .navbar-search { max-width: 220px; }
   .navbar-inner { gap: 10px; }
 }
 
-/* Tablet portrait (640–768px) — collapse links, show hamburger */
-@media (max-width: 768px) {
+/* ≤1024px — bottom nav takes over primary nav, collapse secondary links */
+@media (max-width: 1024px) {
   .hidden-mobile { display: none !important; }
-  .auth-btns { display: none !important; }
-  .mobile-menu-btn { display: flex !important; }
+  /* hamburger permanently hidden — bottom nav replaces it at all sizes */
   .navbar-search { max-width: 180px; }
   .navbar-inner { gap: 8px; padding: 0 14px; }
   .user-btn-name { display: none; }
   .lang-btn { padding: 5px 9px; }
-  /* Notification dropdown repositioned */
   .navbar-notif-dropdown { right: -60px; width: 300px; }
   .user-dropdown { right: 0; min-width: 200px; }
+  /* Compact pills on tablet */
+  .nav-auth-login { padding: 6px 14px; font-size: 0.8rem; }
+  .nav-auth-signup { padding: 6px 14px; font-size: 0.8rem; }
 }
 
-/* Phone large (480–640px) — search hidden, tighter */
+/* 480–640px — hide search, tighter spacing */
 @media (max-width: 640px) {
   .navbar-search { display: none !important; }
   .navbar-inner { padding: 0 10px; gap: 6px; }
@@ -307,9 +356,15 @@
   .user-dropdown { right: 0; min-width: 190px; }
   .lang-btn { padding: 4px 8px; font-size: 0.73rem; }
   .navbar-notif-btn { width: 34px; height: 34px; }
+  /* Show both auth pills on mobile — they're the only nav controls now */
+  .nav-auth-login { display: flex; padding: 6px 12px; font-size: 0.76rem; }
+  .nav-auth-signup { padding: 6px 14px; font-size: 0.78rem; }
+  /* Keep lang + theme visible on mobile — hamburger is gone */
+  .lang-switcher { display: flex; }
+  .navbar-theme-btn { display: flex !important; }
 }
 
-/* Phone small (360–480px) */
+/* 360–480px */
 @media (max-width: 480px) {
   .navbar-inner { padding: 0 8px; gap: 5px; }
   .navbar-logo-icon { width: 28px; height: 28px; }
@@ -320,10 +375,10 @@
   .lang-btn { padding: 4px 7px; font-size: 0.7rem; }
   .user-btn { padding: 4px 8px; }
   .user-dropdown { min-width: 178px; right: 0; }
-  .mobile-menu-btn { width: 32px; height: 32px; }
+  .nav-auth-signup { padding: 6px 12px; font-size: 0.75rem; }
 }
 
-/* Phone XS (< 360px) */
+/* < 360px */
 @media (max-width: 360px) {
   .navbar-inner { padding: 0 6px; gap: 4px; }
   .logo-text { display: none; }
@@ -334,8 +389,7 @@
 /* ── Mobile nav drawer ── */
 .mobile-menu-btn {
   width: 36px; height: 36px;
-  display: none;
-  align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
   background: none; border: 1px solid var(--border);
   border-radius: var(--r-sm); cursor: pointer;
   color: var(--text-2); flex-shrink: 0;
@@ -345,10 +399,20 @@
 .mobile-menu {
   position: fixed; top: 68px; left: 0; right: 0; bottom: 0;
   background: var(--surface); z-index: 998;
-  overflow-y: auto;
-  display: flex; flex-direction: column;
+  overflow-y: auto; display: flex; flex-direction: column;
   border-top: 1px solid var(--border);
   animation: slideDown 0.2s ease;
+  /* Reserve space for the bottom nav when present */
+  padding-bottom: 0;
+}
+/* When bottom nav is visible, push drawer content above it */
+body.has-bottom-nav .mobile-menu {
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+@media (display-mode: standalone) {
+  body.has-bottom-nav .mobile-menu {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
 }
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
@@ -372,24 +436,7 @@
 [data-theme="dark"] .mobile-menu-divider { background: var(--bg-3); }
 [data-theme="dark"] .mobile-menu-btn { border-color: var(--border); color: var(--text-2); }
 
-/* Navbar dark mode auth buttons */
-[data-theme="dark"] .auth-btns .btn-ghost {
-  border-color: var(--border);
-  color: var(--text-2);
-  background: transparent;
-}
-[data-theme="dark"] .auth-btns .btn-ghost:hover {
-  background: var(--bg-2);
-  color: var(--text-1);
-  border-color: var(--border-2);
-}
-[data-theme="dark"] .auth-btns .btn-primary {
-  background: var(--brand);
-  border-color: var(--brand);
-  color: white;
-}
-
-/* Navbar dark mode — notification & search (v46) */
+/* Navbar dark mode — notification & search */
 [data-theme="dark"] .navbar-notif-btn { color: var(--text-3); border-color: var(--border); background: var(--bg-2); }
 [data-theme="dark"] .navbar-notif-btn:hover { background: var(--bg-3); color: var(--brand); }
 [data-theme="dark"] .navbar-notif-dropdown { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow-lg); }

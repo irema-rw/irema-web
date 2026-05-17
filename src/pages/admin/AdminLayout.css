@@ -59,7 +59,7 @@
 }
 .al-search::placeholder { color: var(--ghost); }
 .al-search:focus { background: white; border-color: var(--ad-ink); box-shadow: 0 0 0 3px rgba(0,0,0,0.08); }
-.al-navbar-right { display: flex; align-items: center; gap: var(--sp-4); padding: 0 var(--sp-5); }
+.al-navbar-right { display: flex; align-items: center; gap: var(--sp-4); padding: 0 var(--sp-5); margin-left: auto; }
 .al-notif-btn {
   position: relative; width: 36px; height: 36px; border-radius: var(--r-sm);
   background: var(--bg); border: 1px solid var(--border); color: var(--muted);
@@ -158,7 +158,7 @@
 .al-sidebar-logout:hover { background: var(--danger-bg); }
 
 /* Main */
-.al-main { flex: 1; padding: var(--sp-8); overflow-y: auto; min-width: 0; }
+.al-main { flex: 1; padding: var(--sp-8); overflow-y: auto; overflow-x: hidden; min-width: 0; }
 
 /* ── Dark mode for admin layout ── */
 [data-theme="dark"] .al-root { background: var(--bg); }
@@ -193,16 +193,16 @@
    nearly invisible. Use --bg-2 (light grey) plus --border-2 for contrast,
    and darken the glyph colour so the "EN / FR / RW / SW" pill reads clearly. */
 .al-icon-btn {
-  width: 34px; height: 34px; border-radius: var(--r-sm);
-  background: var(--bg-2, #f3f4f6); border: 1px solid var(--border-2, #d1d5db); color: var(--text-1, #1a1a2e);
+  width: 34px; height: 34px; border-radius: 50%;
+  background: transparent; border: none; color: var(--text-2, #374151);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all var(--t-fast); font-size: 0.75rem; font-weight: 700; font-family: var(--font-body);
 }
-.al-icon-btn:hover { background: var(--ad-accent-soft); color: var(--ad-ink); border-color: var(--ad-accent); }
+.al-icon-btn:hover { background: var(--bg-2, #f3f4f6); color: var(--ad-ink); }
 .al-lang-btn {
-  min-width: 44px; width: auto; padding: 0 12px;
-  color: var(--text-1); font-weight: 800; letter-spacing: 0.04em;
-  background: var(--bg-2); border: 1px solid var(--border-2);
+  min-width: 44px; width: auto; padding: 5px 10px; border-radius: 8px;
+  color: var(--text-1); font-weight: 700; letter-spacing: 0.04em;
+  background: var(--bg); border: 1px solid var(--border);
 }
 .al-lang-btn:hover { background: var(--ad-accent-soft); color: var(--ad-ink); border-color: var(--ad-accent); }
 .al-lang-dropdown {
@@ -303,7 +303,7 @@
   .al-navbar-brand { padding: 0 8px; gap: 6px; }
   .al-navbar-right { padding: 0 8px; gap: 4px; }
   .al-icon-btn { width: 32px; height: 32px; }
-  .al-lang-btn { padding: 0 8px; font-size: 0.7rem; }
+  .al-lang-btn { padding: 4px 8px; font-size: 0.7rem; }
   .ap-page-header { flex-direction: column; align-items: flex-start; gap: 8px; }
   .ap-table-wrap { overflow-x: auto; }
   .ap-table { min-width: 600px; }
@@ -333,7 +333,7 @@
    ADMIN SIDEBAR — COLLAPSIBLE (v41)
    ═══════════════════════════════════════════════════════ */
 
-/* Sidebar toggle button — hidden on desktop, shown only ≤768px */
+/* Sidebar toggle button — hidden on desktop, shown only ≤1024px */
 .al-icon-btn.al-sidebar-toggle { display: none !important; }
 .al-sidebar-toggle { display: none !important; }
 
@@ -344,14 +344,8 @@
   z-index: 89;
 }
 
-/* Tablet landscape (768–900px): sidebar still visible but narrower */
-@media (max-width: 900px) {
-  .al-sidebar { width: 200px; }
-  .al-main { padding: 20px; }
-}
-
-/* Tablet portrait and below: sidebar collapses off-screen */
-@media (max-width: 768px) {
+/* Tablet landscape (900–1024px): sidebar narrows */
+@media (max-width: 1024px) {
   .al-body { position: relative; }
   .al-sidebar-toggle { display: flex !important; }
   .al-sidebar-overlay { display: block; }

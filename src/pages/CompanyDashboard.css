@@ -57,8 +57,7 @@
 .biz-nav-brandname span { color: var(--biz-brand); font-weight: 600; }
 .biz-nav-right { display: flex; align-items: center; gap: 8px; }
 .biz-nav-btn {
-  color: var(--biz-text-2, #374151) !important;
-  width: 36px; height: 36px; border-radius: var(--biz-r-sm); border: 1px solid var(--biz-border);
+  width: 34px; height: 34px; border-radius: 50%; border: none;
   background: transparent; color: var(--biz-text-3); cursor: pointer;
   display: flex; align-items: center; justify-content: center; transition: all 0.2s;
   position: relative;
@@ -72,9 +71,9 @@
 }
 .biz-user-wrap { position: relative; }
 .biz-user-pill {
-  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
-  border-radius: 50px; border: 1px solid var(--biz-border); background: transparent;
-  cursor: pointer; color: var(--biz-text-2); font-size: 0.85rem; font-weight: 600;
+  display: flex; align-items: center; gap: 7px; padding: 5px 12px;
+  border-radius: 99px; border: 1px solid var(--biz-border); background: transparent;
+  cursor: pointer; color: var(--biz-text-2); font-size: 0.82rem; font-weight: 600;
   transition: all 0.2s; font-family: inherit;
 }
 .biz-user-pill:hover { background: var(--biz-bg-2); }
@@ -101,6 +100,12 @@
 }
 .biz-drop-item:hover { background: var(--biz-bg-2); color: var(--biz-text-1); }
 .biz-drop-logout { color: #ef4444 !important; }
+
+/* Desktop-only dropdown items — hidden at ≤1024px where BizBottomNav handles navigation */
+.biz-drop-desktop-only { display: flex; }
+@media (max-width: 1024px) {
+  .biz-drop-desktop-only { display: none !important; }
+}
 
 /* ── Layout ── */
 .biz-layout { display: flex; max-width: 1440px; margin: 0 auto; min-height: calc(100vh - 60px); }
@@ -380,9 +385,12 @@
 
 @keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform: none; opacity:1; } }
 .biz-lang-sel {
-  padding: 6px 10px; border: 1px solid var(--biz-border); border-radius: var(--biz-r-sm);
+  padding: 5px 10px; border: 1px solid var(--biz-border); border-radius: 8px;
   background: var(--biz-surface); color: var(--biz-text-2); font-size: 0.78rem; font-weight: 700;
-  font-family: inherit; cursor: pointer; min-width: 52px;
+  font-family: inherit; cursor: pointer; min-width: unset; appearance: none;
+  -webkit-appearance: none; padding-right: 22px;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='3' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center;
 }
 .biz-lang-sel:focus { outline: none; border-color: var(--biz-brand); }
 
@@ -398,48 +406,64 @@
 }
 .biz-logo-upload-btn:hover { background: var(--biz-green-dk); }
 
-/* ── Business Dashboard Mobile (v26) ── */
-@media (max-width: 768px) {
-  .biz-layout { flex-direction: column; }
-  .biz-sidebar { width: 100% !important; min-width: unset !important; border-right: none; border-bottom: 1px solid var(--biz-border); }
-  .biz-sidebar-inner { padding: 12px; }
-  .biz-sidebar-company { margin-bottom: 8px; }
-  .biz-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; padding-bottom: 4px; }
-  .biz-nav-item { flex: 0 0 auto; }
-  .biz-nav-link { padding: 6px 10px; font-size: 0.78rem; }
-  .biz-nav-label { display: none; }
-  .biz-content { padding: 16px; }
-  .biz-page-header { flex-direction: column; align-items: flex-start; gap: 10px; }
-  .biz-rc-header { flex-wrap: wrap; gap: 6px; }
-  .biz-review-card { padding: 14px; }
-  .biz-stat-card { padding: 16px; }
-  .biz-overview-grid { grid-template-columns: 1fr 1fr !important; }
-}
-@media (max-width: 480px) {
-  .biz-overview-grid { grid-template-columns: 1fr !important; }
-  .biz-nav { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 8px; -ms-overflow-style: none; scrollbar-width: none; }
-  .biz-nav::-webkit-scrollbar { display: none; }
-  .biz-navbar-inner { padding: 0 12px; }
-  .biz-nav-brandname { font-size: 0.9rem; }
-}
+/* ─────────────────────────────────────────────
+   Business Dashboard — Mobile + Tablet (≤ 1024px)
+   Sidebar hidden — BizBottomNav takes over navigation.
+───────────────────────────────────────────── */
+@media (max-width: 1024px) {
 
-/* ── CompanyDashboard extra mobile (v36) ── */
-@media (max-width: 640px) {
-  .biz-sidebar { width: 100%; min-width: unset; padding-top: 60px; }
-  .biz-layout { flex-direction: column; }
-  .biz-main { min-width: 0; overflow-x: hidden; }
+  /* Hide sidebar — bottom nav replaces it */
+  .biz-sidebar { display: none !important; }
+
+  /* Content fills full width */
+  .biz-main { min-width: 0; overflow-x: hidden; width: 100%; }
   .biz-content { padding: 16px; }
-  .biz-page-header { flex-direction: column; gap: 12px; align-items: flex-start; }
-  .biz-stat-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  /* Page headers */
+  .biz-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .biz-page-header h1 { font-size: 1.25rem; }
+
+  /* Cards and reviews */
+  .biz-review-card { padding: 14px; }
+  .biz-rc-header { flex-wrap: wrap; gap: 6px; }
+  .biz-card { padding: 16px; }
+
+  /* KPI grid — 2 columns */
+  .biz-kpi-row { grid-template-columns: 1fr 1fr; }
+  .biz-kpi-card { padding: 14px; gap: 10px; }
+  .biz-kpi-val { font-size: 1.3rem; }
+
+  /* Overview grid — 1 column */
+  .biz-overview-grid { grid-template-columns: 1fr !important; }
+
+  /* Analytics */
   .biz-analytics-kpis { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
   .biz-analytics-kpi-val { font-size: 1.3rem; }
+  .biz-charts-grid { grid-template-columns: 1fr; }
+
+  /* Plans */
+  .biz-plans-grid { grid-template-columns: 1fr; }
+
+  /* Navbar */
+  .biz-navbar-inner { padding: 0 12px; }
+  .biz-nav-brandname { font-size: 0.9rem; }
+  .biz-user-name { display: none; }
 }
+
 @media (max-width: 480px) {
-  .biz-stat-cards { grid-template-columns: 1fr 1fr; }
-  .biz-nav-links { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .biz-nav-btn { font-size: 0.78rem; padding: 8px 10px; white-space: nowrap; flex-shrink: 0; }
-}
-@media (max-width: 360px) {
   .biz-content { padding: 12px; }
-  .biz-stat-cards { grid-template-columns: 1fr; }
+  .biz-kpi-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .biz-kpi-card { padding: 12px; }
+  .biz-kpi-val { font-size: 1.2rem; }
+  .biz-stat-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+}
+
+@media (max-width: 360px) {
+  .biz-content { padding: 10px; }
+  .biz-kpi-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .biz-nav-link { padding: 6px 8px; font-size: 0.63rem; min-width: 46px; }
 }

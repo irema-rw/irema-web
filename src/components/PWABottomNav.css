@@ -1,0 +1,190 @@
+/* ─────────────────────────────────────────────────────────────────────
+   Bottom Navigation Bar — Option A (Centre CTA)
+   5 tabs: Home · Discover · [✍ Review] · Top Rated · Account
+   Visible on ALL browsers ≤ 1024px (mobile + tablet) and in standalone PWA.
+───────────────────────────────────────────────────────────────────── */
+
+.pwa-bottom-nav {
+  display: none;
+}
+
+/* ── Show on mobile + tablet (all browsers up to desktop) ── */
+@media (max-width: 1024px) {
+
+  .pwa-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: #ffffff;
+    border-top: 1px solid rgba(0, 0, 0, 0.07);
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.07);
+    align-items: stretch;
+    justify-content: space-around;
+    /* Lift bar slightly to give the CTA button room to pop up */
+    overflow: visible;
+  }
+
+  [data-theme="dark"] .pwa-bottom-nav {
+    background: #1a1f2e;
+    border-top-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  /* ── Regular tabs ── */
+  .pwa-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px 4px;
+    text-decoration: none;
+    color: #9ca3af;
+    font-size: 0.63rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    position: relative;
+    transition: color 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+  }
+
+  .pwa-nav-item:hover { color: #6b7280; }
+
+  [data-theme="dark"] .pwa-nav-item         { color: #6b7280; }
+  [data-theme="dark"] .pwa-nav-item:hover   { color: #9ca3af; }
+
+  /* Active state */
+  .pwa-nav-active             { color: #1ECAB8 !important; }
+  [data-theme="dark"] .pwa-nav-active { color: #1ECAB8 !important; }
+
+  .pwa-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    transition: transform 0.18s ease;
+  }
+
+  .pwa-nav-active .pwa-nav-icon { transform: translateY(-1px); }
+
+  .pwa-nav-label {
+    font-size: 0.63rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .pwa-nav-active .pwa-nav-label { font-weight: 700; }
+
+  /* Active indicator dot */
+  .pwa-nav-dot {
+    position: absolute;
+    top: 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #1ECAB8;
+    opacity: 0.6;
+  }
+
+  .pwa-nav-item:active .pwa-nav-icon {
+    transform: scale(0.88) translateY(-1px);
+  }
+
+  /* ── Centre CTA button ── */
+  .pwa-nav-cta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 6px;
+    gap: 0;
+    position: relative;
+    /* No active dot for CTA */
+  }
+
+  .pwa-cta-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #1ECAB8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(30, 202, 184, 0.45);
+    /* Raise it above the bar */
+    position: relative;
+    top: -10px;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    flex-shrink: 0;
+  }
+
+  .pwa-nav-cta:hover .pwa-cta-btn,
+  .pwa-nav-cta:active .pwa-cta-btn {
+    transform: translateY(-2px) scale(1.06);
+    box-shadow: 0 6px 20px rgba(30, 202, 184, 0.55);
+  }
+
+  .pwa-nav-cta:active .pwa-cta-btn {
+    transform: scale(0.93) translateY(-8px);
+  }
+
+  [data-theme="dark"] .pwa-cta-btn {
+    background: #1ECAB8;
+    box-shadow: 0 4px 20px rgba(30, 202, 184, 0.35);
+  }
+
+  .pwa-cta-label {
+    font-size: 0.63rem;
+    font-weight: 700;
+    color: #1ECAB8 !important;
+    margin-top: -4px; /* pull label up under the raised circle */
+    line-height: 1;
+  }
+
+  /* Body padding so content clears the bar */
+  body.has-bottom-nav {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ── Standalone PWA on desktop (> 1024px) — still show the bar ── */
+@media (display-mode: standalone) and (min-width: 1025px) {
+
+  .pwa-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 1000;
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: #ffffff;
+    border-top: 1px solid rgba(0, 0, 0, 0.07);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+    align-items: stretch;
+    justify-content: space-around;
+    overflow: visible;
+  }
+
+  [data-theme="dark"] .pwa-bottom-nav {
+    background: #1a1f2e;
+    border-top-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  body.has-bottom-nav,
+  body.pwa-standalone {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
